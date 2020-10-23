@@ -5,7 +5,7 @@ A no_std monochrome raster graphics library
 
 ## WebAssembly Demo
 
-Hosted: https://samblenny.github.io/ui_sim/mkwasm/www/
+Hosted: https://samblenny.github.io/guilib/examples/mkwasm/www/
 
 Local (requires ruby and make):
 
