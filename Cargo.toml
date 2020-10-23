@@ -1,0 +1,7 @@
+[package]
+name = "guilib"
+version = "0.1.0"
+authors = ["samblenny"]
+edition = "2018"
+
+[dependencies]

@@ -1,0 +1,38 @@
+html{-webkit-text-size-adjust:none;font-size:16px;font-family:sans-serif;}
+html,body{min-height:100vh;width:100vw;background:#6A7F77;}
+html,body,div,pre,h1,p,button,label,select,textarea,svg{margin:0;padding:0;box-sizing:border-box;}
+body,div,pre,h1,p,button,select,textarea{font-size:inherit;color:inherit;}
+p{margin:0.3em 10px;}
+header{grid-area:H;color:#ddd;display:flex;align-items:baseline;}
+#screen{grid-area:S;background:#fff;overflow:auto;}
+#controls{grid-area:C;display:block;padding:10px;border:none;}
+#keyboard{grid-area:K;background:#4b4b4b;width:485px;height:389px;border:none;border-radius:6px;}
+body{display:grid;
+ grid:". . . . . . " 20px
+      ". . S . H  ." 41px
+      ". . S . C  ." auto
+      ". . S . K  ." auto
+      ". . . . .  ." 1fr
+      / minmax(10px,1fr) 72px 336px 72px 480px minmax(10px,1fr);}
+header h1{display:inline-block;font-size:1.5em;margin-left:2px;margin-right:auto;color:#ddd;}
+#controls button, #controls select{
+    padding:4px;border-radius:6px;border:2px solid #999;
+    font-size:15px;background:#ccc;color:black;}
+#controls button{margin:0 13px;padding:4px 8px;}
+#controls button{background:#ddd;}
+#controls button.on{background:#96e00e;}
+#controls label{margin:0 4px;}
+#screen{width:336px;height:536px;background:#aabac9;}
+#screen.backlit{background:#96e00e;}
+#keyboard text.tc{text-anchor:middle;user-select:none;-webkit-user-select: none;}
+#keyboard text.tl{text-anchor:left;user-select:none;-webkit-user-select: none;}
+#keyboard{-webkit-touch-callout:none;-webkit-user-select:none;/*prevent unintended selecting in iOS*/}
+#keyboard rect{stroke-width:2px;stroke-linecap:square;stroke:#1a1a1a;fill:#1a1a1a;}
+#keyboard rect{-webkit-tap-highlight-color: transparent;/*turn off default gray tap overlay*/}
+#keyboard rect.glow{stroke-width:3;stroke:#96e00e;fill:#000;/*click feedback*/}
+#keyboard text{stroke:none;fill:#eee;pointer-events:none/*only rect gets clicks*/;}
+#keyboard text.b{fill:#5ec9c9;font-size:14px;}
+#keyboard text.c{fill:#ee7333;font-size:14px;}
+#keyboard text.md{font-size:18px;}
+#keyboard text.lg{font-size:22px;}
+#keyboard path{fill:none;stroke:#eee;stroke-width:2px;stroke-linecap:round;}
