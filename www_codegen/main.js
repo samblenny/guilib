@@ -7,6 +7,65 @@ const bitmap = document.querySelector('#bitmap');
 const imgSelect = document.querySelector('#imgSelect');
 const ctx = canvas.getContext('2d');
 
+// This dictionary determines the glyph grid layout and unicode block character
+// maps to be used for each of the glyph sheets.
+// - name: Font name for this glyph sheet
+// - columns: Number of columns in the glyph grid
+// - gutter: Width in pixels of gutter and padding separating glyphs
+// - blocks: Unicode blocks to be included in the match {...} for the glyph sheet
+// - charMap: Name of the charMap to use (how to map codepoint to (row, col) in grid)
+// - legal: Text of legal notice comment to include in generated source code
+const glyphSheetConfig = {
+    "img/bold.png": {
+        name: "Bold",
+        columns: 16,
+        gutter: 2,
+        blocks: ["basicLatin", "latin1", "latinExtendedA", "generalPunctuation",
+                 "currencySymbols", "privateUseArea", "specials"],
+        charMap: "sysLatin",
+        legal: `// This file incorporates glyphs from the Chicago bitmap typeface which was
+// designed by Susan Kare and released by Apple in 1984. Chicago is a
+// registered trademark of Apple Inc.`
+    },
+    "img/regular.png": {
+        name: "Regular",
+        columns: 16,
+        gutter: 2,
+        blocks: ["basicLatin", "latin1", "latinExtendedA", "generalPunctuation",
+                 "currencySymbols", "privateUseArea", "specials"],
+        charMap: "sysLatin",
+        legal: `// This file incorporates glyphs from the Geneva bitmap typeface which was
+// designed by Susan Kare and released by Apple in 1984. Geneva is a registered
+// trademark of Apple Inc.`
+    },
+    "img/small.png": {
+        name: "Small",
+        columns: 16,
+        gutter: 2,
+        blocks: ["basicLatin", "latin1", "latinExtendedA", "generalPunctuation",
+                 "currencySymbols", "specials"],
+        charMap: "sysLatin",
+        legal: `// This file incorporates glyphs from the Geneva bitmap typeface which was
+// designed by Susan Kare and released by Apple in 1984. Geneva is a registered
+// trademark of Apple Inc.`
+    },
+    "img/sas_emoji.png": {
+        name: "SASEmoji",
+        columns: 8,
+        gutter: 2,
+        blocks: ["basicLatin", "latin1", "latinExtendedA", "generalPunctuation",
+                 "currencySymbols", "privateUseArea", "specials"],
+        charMap: "sasEmoji",
+        legal: `// This file incorporates graphics from twemoji.
+// Twemoji License Notice:
+// > Copyright 2019 Twitter, Inc and other contributors
+// > Code licensed under the MIT License: http://opensource.org/licenses/MIT
+// > Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+// Twemoji Source Code Link:
+// - https://github.com/twitter/twemoji`
+    }
+};
+
 window.addEventListener('load', init);
 
 function init(e) {
@@ -32,29 +91,49 @@ function paintPngToCanvas() {
 }
 
 function doCanvasClick(e) {
+    let config = glyphSheetConfig[imgSelect.value];
     let bbox = e.target.getBoundingClientRect();
     let x = e.clientX - Math.floor(bbox.left);
     let y = e.clientY - Math.floor(bbox.top);
-    const border = 2;
-    const columns = 16;
-    // Grid is 16x16 boxes of 24x24px or 30x30px with 2px gutters and borders
+    const border = config.gutter;
+    const columns = config.columns;
+    const rows = columns;
     let gridSize = Math.floor((canvas.width - border) / columns);
     // Determine which grid box contains the click coordinate
     let row = Math.floor(y/gridSize);
     let col = Math.floor(x/gridSize);
-    let maxTrim = getMaxTrim(row, col, gridSize);
-    let [pxMatrix, yOffset] = convertGlyphBoxToMatrix(row, col, maxTrim);
+    if (row >= rows || col >= columns) {
+        // Skip clicks that are out of range (on borders)
+        return;
+    }
+    let maxTrim = getMaxTrim(config, row, col, gridSize);
+    let [pxMatrix, yOffset] = convertGlyphBoxToMatrix(config, row, col, maxTrim);
     preOut.textContent = convertMatrixToText(pxMatrix, yOffset, row, col);
 }
 
+function getCharMap(mapName) {
+    return {
+        sysLatin: sysLatinCharMap,
+        sasEmoji: sasEmojiCharMap
+    }[mapName];
+}
+
 function renderCharMap() {
+    let config = glyphSheetConfig[imgSelect.value];
     let data_buf = [];
     let str_buf = [];
-    const border = 2;
-    const columns = 16;
+    const border = config.gutter;
+    const columns = config.columns;
+    const rows = columns;
     let gridSize = Math.floor((canvas.width - border) / columns);
+    const charMap = getCharMap(config.charMap);
     for (let k of Object.keys(charMap).sort((a,b) => a-b)) {
         let v = charMap[k];
+        if (v.row >= rows || v.col >= columns) {
+            // Skip sprites for mis-configured charMap (row or col out of range)
+            console.log(`row or col out of range: (row:${v.row}, col:${v.col})`);
+            continue;
+        }
         let isUISprite = (0xE000 <= k) && (k <= 0xF8FF);
         if (isUISprite && !['img/bold.png', 'img/regular.png'].includes(imgSelect.value)) {
             // Skip sprites for small.png
@@ -62,8 +141,8 @@ function renderCharMap() {
             continue;
         }
         v.start = data_buf.length;
-        let maxTrim = getMaxTrim(v.row, v.col, gridSize);
-        let [matrix, yOffset] = convertGlyphBoxToMatrix(v.row, v.col, maxTrim);
+        let maxTrim = getMaxTrim(config, v.row, v.col, gridSize);
+        let [matrix, yOffset] = convertGlyphBoxToMatrix(config, v.row, v.col, maxTrim);
         let pattern = convertMatrixToPattern(matrix, yOffset);
         Array.prototype.push.apply(data_buf, pattern);
         let description = '';
@@ -84,14 +163,16 @@ function renderCharMap() {
         let rust = convertPatternToRust(pattern, comment);
         str_buf.push(rust);
     }
-    let fontName = {
-        'img/bold.png': 'Bold',
-        'img/regular.png': 'Regular',
-        'img/small.png': 'Small'
-    }[imgSelect.value];
+    let fontName = config.name;
     let rustCode = `
 #![allow(dead_code)]
 //! ${fontName} Font
+
+// This file was automatically generated. To make changes, see
+// www_codegen/{main.js,index.html,img/*.png}
+
+// Legal Stuff:
+${config.legal}
 
 ${buildCharMapIndex()}
 
@@ -119,6 +200,11 @@ ${str_buf.join("\n")}
 // Return rust source for lookup table from char code to glyph pattern offset
 // in DATA array
 function buildCharMapIndex() {
+    const config = glyphSheetConfig[imgSelect.value];
+    const charMap = getCharMap(config.charMap);
+    if (charMap === sasEmojiCharMap) {
+        return "";
+    }
     // Unicode Blocks
     let basicLatin = [];         // Block:     00..7E; Subset:     20..7E
     let latin1 = [];             // Block:     80..FF; Subset:     A0..FF
@@ -203,14 +289,16 @@ const SPECIALS: [u16; ${specials.length}] = [
 }
 
 // Look up trim limits based on row & column in glyph grid
-function getMaxTrim(row, col, gridSize) {
-    // Radio strength bars get trimmed to match bounds of three bars
-    if (col === 0 && [5, 6, 7, 8, 9].includes(row)) {
-        return [7, 5, 6, 4];
-    }
-    // Space gets 4px width and 2px height
-    if (col === 2 && row === 0) {
-        return [Math.floor((gridSize-3)/2), Math.floor((gridSize-5)/2)];
+function getMaxTrim(config, row, col, gridSize) {
+    if (config.charMap === "sysLatin") {
+        // Radio strength bars get trimmed to match bounds of three bars
+        if (col === 0 && [5, 6, 7, 8, 9].includes(row)) {
+            return [7, 5, 6, 4];
+        }
+        // Space gets 4px width and 2px height
+        if (col === 2 && row === 0) {
+            return [Math.floor((gridSize-3)/2), Math.floor((gridSize-5)/2)];
+        }
     }
     // Everything else gets default trim
     return null;
@@ -223,9 +311,9 @@ function getMaxTrim(row, col, gridSize) {
 //   trim from border around glyph in grid cell
 // Trim limits allow creation of patterns with whitespace borders, useful for
 // purposes like making the radio strength sprites have the same size pattern.
-function convertGlyphBoxToMatrix(row, col, maxTrim) {
-    const border = 2;
-    const columns = 16;
+function convertGlyphBoxToMatrix(config, row, col, maxTrim) {
+    const border = config.gutter;
+    const columns = config.columns;
     const rows = columns;
     if (row < 0 || row >= rows || col < 0 || col >= columns) {
         // Ignore clicks on grid border, etc.
@@ -383,7 +471,11 @@ function matrixTranspose(matrix) {
     return transposed;
 }
 
-var charMap = {
+var sasEmojiCharMap = {
+    
+};
+
+var sysLatinCharMap = {
     32: {row: 0, col: 2, hex: '20', chr: ' '},
     33: {row: 1, col: 2, hex: '21', chr: '!'},
     34: {row: 2, col: 2, hex: '22', chr: '\"'},
