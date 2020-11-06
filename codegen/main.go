@@ -12,13 +12,16 @@ import (
 // Path for output files with generated font code
 const outPath = "../src/fonts"
 
+// Path for glyph grid sprite sheet input files
+const inPath = "img"
+
 // Spec for how to generate font source code files from glyph grid sprite sheets
 func fonts() []FontSpec {
 	return []FontSpec{
 		FontSpec{"Emoji", "emoji48x48_o3x0.png", 48, 16, 0, 0, "emoji_index.txt", twemoji, "emoji.rs"},
-		FontSpec{"Bold", "bold.png", 30, 16, 2, 2, "bold_index.txt", chicago, "bold.rs"},
-		FontSpec{"Regular", "regular.png", 30, 16, 2, 2, "regular_index.txt", geneva, "regular.rs"},
-		FontSpec{"Small", "small.png", 24, 16, 2, 2, "small_index.txt", geneva, "small.rs"},
+		FontSpec{"Bold", "bold.png", 30, 16, 2, 2, "", chicago, "bold.rs"},
+		FontSpec{"Regular", "regular.png", 30, 16, 2, 2, "", geneva, "regular.rs"},
+		FontSpec{"Small", "small.png", 24, 16, 2, 2, "", geneva, "small.rs"},
 	}
 }
 
