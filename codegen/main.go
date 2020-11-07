@@ -2,52 +2,38 @@ package main
 
 import (
 	"bytes"
-	"codegen/blocks"
 	"fmt"
+	"guilib/codegen/font"
+	"image/png"
 	"os"
 	"strings"
 	"text/template"
 )
 
+type CharSpec font.CharSpec
+
 // Path for output files with generated font code
 const outPath = "../src/fonts"
 
-// Path for glyph grid sprite sheet input files
-const inPath = "img"
-
 // Spec for how to generate font source code files from glyph grid sprite sheets
-func fonts() []FontSpec {
-	return []FontSpec{
-		FontSpec{"Emoji", "emoji48x48_o3x0.png", 48, 16, 0, 0, "emoji_index.txt", twemoji, "emoji.rs"},
-		FontSpec{"Bold", "bold.png", 30, 16, 2, 2, "", chicago, "bold.rs"},
-		FontSpec{"Regular", "regular.png", 30, 16, 2, 2, "", geneva, "regular.rs"},
-		FontSpec{"Small", "small.png", 24, 16, 2, 2, "", geneva, "small.rs"},
+func fonts() []font.FontSpec {
+	return []font.FontSpec{
+		font.FontSpec{"Emoji", "img/emoji48x48_o3x0.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
+		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
+		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
+		font.FontSpec{"Small", "img/small.png", 24, 16, 2, 2, geneva, "small.rs"},
 	}
-}
-
-// Holds description of sprite sheet and character map for generating a font
-type FontSpec struct {
-	Name    string // Name of font
-	Sprites string // Which file holds the sprite sheet image with the grid of glyphs?
-	Size    int    // How many pixels on a side is each glyph (precondition: square glyphs)
-	Cols    int    // How many glyphs wide is the grid?
-	Gutter  int    // How many px between glyphs?
-	Border  int    // How many px wide are top and left borders?
-	Index   string // Which file holds index of unicode for sprites?
-	Legal   string // What credits or license notices need to be included in font file comments?
-	RustOut string // Where should the generated source code go?
 }
 
 // Generate rust source code files for fonts
 func codegen() {
-	blocks.DoNothing()
 	templateString := strings.TrimLeft(`
 #![allow(dead_code)]
 //! {{.Font.Name}} Font
 //
 {{.Font.Legal}}
 
-{{.CharMapIndex}}
+{{.Index}}
 
 /// Maximum height of glyph patterns in this bitmap typeface.
 /// This will be true: h + yOffset <= MAX_HEIGHT
@@ -63,39 +49,31 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 ///  h: Height of pattern in pixels
 ///  yOffset: Vertical offset (pixels downward from top of line) to position
 ///     glyph pattern properly relative to text baseline
-pub const DATA: [u32; {{.DataBufLen}}] = [
-{{.DataBuf}}
-];
+{{.Data}}
 `, "\n")
 	t := template.Must(template.New("usage").Parse(templateString))
 	for _, f := range fonts() {
 		fmt.Println("=======================================================")
+		var data string
 		var index string
-		var dataBuf string
-		var dataBufLen int
 		switch f.Name {
 		case "Emoji":
-			index = "/* TODO: Emoji char index */"
-			dataBuf, dataBufLen = emojiData(f)
+			index, data = emojiIndexData(f)
 		case "Bold":
-			index = sysLatinIndex(true)
-			dataBuf, dataBufLen = sysLatinData(f, true)
+			index, data = sysLatinIndexData(f, true)
 		case "Regular":
-			index = sysLatinIndex(true)
-			dataBuf, dataBufLen = sysLatinData(f, true)
+			index, data = sysLatinIndexData(f, true)
 		case "Small":
-			index = sysLatinIndex(false)
-			dataBuf, dataBufLen = sysLatinData(f, false)
+			index, data = sysLatinIndexData(f, false)
 		default:
 			panic("unexpected FontSpec.Name")
 		}
 		context := struct {
-			Font         FontSpec
-			OutPath      string
-			CharMapIndex string
-			DataBufLen   int
-			DataBuf      string
-		}{f, outPath, index, dataBufLen, dataBuf}
+			Font    font.FontSpec
+			OutPath string
+			Index   string
+			Data    string
+		}{f, outPath, index, data}
 		err := t.Execute(os.Stdout, context)
 		if err != nil {
 			panic(err)
@@ -103,23 +81,16 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 	}
 }
 
-// Generate rust code (comments and u32 literals) for emoji glyphs packed as [u32]
-func emojiData(font FontSpec) (dataBuf string, dataBufLen int) {
-	dataBuf = "/* TODO */"
-	dataBufLen = -1
+// Generate rust code for emoji glyphs packed as [u32] along with corresponding index
+func emojiIndexData(font font.FontSpec) (index, data string) {
+	index = "/* TODO: Emoji index */"
+	data = "/* TODO: Emoji data */"
 	return
 }
 
-// Generate rust code (comments and u32 literals) for sysLatin glyphs packed as [u32]
-func sysLatinData(font FontSpec, privateUseArea bool) (dataBuf string, dataBufLen int) {
-	dataBuf = "/* TODO */"
-	dataBufLen = -1
-	return
-}
-
-// Generate charmap index source code string for sysLatin style glyph sheet (16x16 grid)
-func sysLatinIndex(privateUseArea bool) string {
-	templateString := strings.TrimSpace(`
+// Generate rust code for sysLatin glyphs packed as [u32] along with corresponding index
+func sysLatinIndexData(fs font.FontSpec, hasPUA bool) (index, data string) {
+	indexTemplate := strings.TrimSpace(`
 /// Return offset into DATA[] for start of pattern depicting glyph for character c
 pub fn get_glyph_pattern_offset(c: char) -> usize {
     match c as u32 {
@@ -127,57 +98,154 @@ pub fn get_glyph_pattern_offset(c: char) -> usize {
         0xA0..=0xFF => LATIN_1[(c as usize) - 0xA0] as usize,
         0x152..=0x153 => LATIN_EXTENDED_A[(c as usize) - 0x152] as usize,
         0x2018..=0x2022 => GENERAL_PUNCTUATION[(c as usize) - 0x2018] as usize,
-        0x20AC..=0x20AC => CURRENCY_SYMBOLS[(c as usize) - 0x20AC] as usize,{{if .PrivateUseArea}}
+        0x20AC..=0x20AC => CURRENCY_SYMBOLS[(c as usize) - 0x20AC] as usize,{{if gt (len .PrivateUseArea) 0}}
         0xE700..=0xE70C => PRIVATE_USE_AREA[(c as usize) - 0xE700] as usize,{{end}}
         _ => SPECIALS[(0xFFFD as usize) - 0xFFFD] as usize,
     }
 }
 
 // Index to Unicode Basic Latin block glyph patterns
-const BASIC_LATIN: [u16; ${basicLatin.length}] = [
-    ${basicLatin.map(v => v.start + ", // '" + v.chr + "'").join("\n    ")}
+const BASIC_LATIN: [u16; {{len .BasicLatin}}] = [
+    {{.BasicLatin.FormatRustCode}}
 ];
 
 // Index to Unicode Latin 1 block glyph patterns
-const LATIN_1: [u16; ${latin1.length}] = [
-    ${latin1.map(v => v.start + ", // '" + v.chr + "'").join("\n    ")}
+const LATIN_1: [u16; {{len .Latin1}}] = [
+    {{.Latin1.FormatRustCode}}
 ];
 
 // Index to Unicode Latin Extended A block glyph patterns
-const LATIN_EXTENDED_A: [u16; ${latinExtendedA.length}] = [
-    ${latinExtendedA.map(v => v.start + ", // '" + v.chr + "'").join("\n    ")}
+const LATIN_EXTENDED_A: [u16; {{len .LatinExtendedA}}] = [
+    {{.LatinExtendedA.FormatRustCode}}
 ];
 
 // Index to General Punctuation block glyph patterns
-const GENERAL_PUNCTUATION: [u16; ${generalPunctuation.length}] = [
-    ${generalPunctuation.map(v => v.start + ", // '" + v.chr + "'").join("\n    ")}
+const GENERAL_PUNCTUATION: [u16; {{len .GeneralPunctuation}}] = [
+    {{.GeneralPunctuation.FormatRustCode}}
 ];
 
 // Index to Unicode Currency Symbols block glyph patterns
-const CURRENCY_SYMBOLS: [u16; ${currencySymbols.length}] = [
-    ${currencySymbols.map(v => v.start + ", // '" + v.chr +"'").join("\n    ")}
-];{{if .PrivateUseArea}}
+const CURRENCY_SYMBOLS: [u16; {{len .CurrencySymbols}}] = [
+    {{.CurrencySymbols.FormatRustCode}}
+];{{if gt (len .PrivateUseArea) 0}}
 
 // Index to Unicode Private Use Area block glyph patterns (UI sprites)
-const PRIVATE_USE_AREA: [u16; ${privateUseArea.length}] = [
-    ${privateUseArea.map(v => v.start + ", // " + v.name).join("\n    ")}
+const PRIVATE_USE_AREA: [u16; {{len .PrivateUseArea}}] = [
+    {{.PrivateUseArea.FormatRustCode}}
 ];{{end}}
 
 // Index to Unicode Specials block glyph patterns
-const SPECIALS: [u16; ${specials.length}] = [
-    ${specials.map(v => v.start + ", // '" + v.chr + "'").join("\n    ")}
+const SPECIALS: [u16; {{len .Specials}}] = [
+    {{.Specials.FormatRustCode}}
 ];
 `)
-	t := template.Must(template.New("charMapIndex").Parse(templateString))
-	context := struct {
-		PrivateUseArea bool
-	}{privateUseArea}
-	var buff bytes.Buffer
-	err := t.Execute(&buff, context)
+	dataBufTemplate := strings.TrimSpace(`
+pub const DATA: [u32; {{.DataBufLen}}] = [
+{{.DataBufRust}}
+];
+`)
+	// Arrays for compiling codepoint to blit pattern lookup tables
+	var basicLatin CpToBlitList         // Block:     00..7E; Subset:     20..7E
+	var latin1 CpToBlitList             // Block:     80..FF; Subset:     A0..FF
+	var latinExtendedA CpToBlitList     // Block:   100..17F; Subset:   152..153
+	var generalPunctuation CpToBlitList // Block: 2000..206F; Subset: 2018..2022
+	var currencySymbols CpToBlitList    // Block: 20A0..20CF; Subset: 20AC..20AC
+	var privateUseArea CpToBlitList     // Block: E000..F8FF; Subset: E700..E70C
+	var specials CpToBlitList           // Block: FFF0..FFFF; Subset: FFFD..FFFD
+	// Read glyphs from png file
+	pngFile, err := os.Open(fs.Sprites)
+	if err != nil {
+		panic("unable to open png file")
+	}
+	img, err := png.Decode(pngFile)
+	if err != nil {
+		panic("unable to decode png file")
+	}
+	var dataBuf []uint32
+	var dataBufRust string
+	for _, cs := range font.SysLatinMap() {
+		// ID unicode block for this character
+		block, _ := font.BlockAndIndex(cs.Codepoint)
+		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
+		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
+		fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
+		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
+		headerIndex := uint32(len(dataBuf))
+		dataBuf = append(dataBuf, blitPattern...)
+		comment := fmt.Sprintf("[%d]: %x '%s'", headerIndex, cs.Codepoint, cs.Chr)
+		if block == font.PRIVATE_USE_AREA {
+			comment = fmt.Sprintf("[%d]: %x %s", headerIndex, cs.Codepoint, cs.Chr)
+		}
+		rustCode := font.ConvertPatternToRust(blitPattern, comment)
+		dataBufRust += rustCode
+		// Update the character index with the correct offset (DATA[n]) for pattern header
+		if block == font.BASIC_LATIN {
+			basicLatin = append(basicLatin, CpToBlit{headerIndex, cs})
+		} else if block == font.LATIN_1 {
+			latin1 = append(latin1, CpToBlit{headerIndex, cs})
+		} else if block == font.LATIN_EXTENDED_A {
+			latinExtendedA = append(latinExtendedA, CpToBlit{headerIndex, cs})
+		} else if block == font.GENERAL_PUNCTUATION {
+			generalPunctuation = append(generalPunctuation, CpToBlit{headerIndex, cs})
+		} else if block == font.CURRENCY_SYMBOLS {
+			currencySymbols = append(currencySymbols, CpToBlit{headerIndex, cs})
+		} else if block == font.PRIVATE_USE_AREA {
+			privateUseArea = append(privateUseArea, CpToBlit{headerIndex, cs})
+		} else if block == font.SPECIALS {
+			specials = append(specials, CpToBlit{headerIndex, cs})
+		} else {
+			panic("unexpected block")
+		}
+	}
+	// Render index template
+	indexT := template.Must(template.New("index").Parse(indexTemplate))
+	indexContext := struct {
+		BasicLatin         CpToBlitList
+		Latin1             CpToBlitList
+		LatinExtendedA     CpToBlitList
+		GeneralPunctuation CpToBlitList
+		CurrencySymbols    CpToBlitList
+		PrivateUseArea     CpToBlitList
+		Specials           CpToBlitList
+	}{basicLatin, latin1, latinExtendedA, generalPunctuation, currencySymbols, privateUseArea, specials}
+	var indexStrBuf bytes.Buffer
+	err = indexT.Execute(&indexStrBuf, indexContext)
 	if err != nil {
 		panic(err)
 	}
-	return buff.String()
+	// Render data template
+	dataT := template.Must(template.New("dataBuf").Parse(dataBufTemplate))
+	dataContext := struct {
+		DataBufRust string
+		DataBufLen  int
+	}{dataBufRust, len(dataBuf)}
+	var dataStrBuf bytes.Buffer
+	err = dataT.Execute(&dataStrBuf, dataContext)
+	if err != nil {
+		panic(err)
+	}
+	// Return
+	index = indexStrBuf.String()
+	data = dataStrBuf.String()
+	return
+}
+
+// An element of lookup tables to translate from codepoint block to blit pattern
+type CpToBlit struct {
+	DataIndex uint32
+	CS        font.CharSpec
+}
+
+// Type for slice of CpToBlit (so they can be used with .FormatRustCode in template strings)
+type CpToBlitList []CpToBlit
+
+// Format the inner elements of a [u16; n] codepoint to blit pattern index translation table
+func (ctbList CpToBlitList) FormatRustCode() string {
+	var rustCode []string
+	for _, ctb := range ctbList {
+		rustCode = append(rustCode, fmt.Sprintf("%d, // '%s'", ctb.DataIndex, ctb.CS.Chr))
+	}
+	return strings.Join(rustCode, "\n    ")
 }
 
 // Print usage message
@@ -196,7 +264,7 @@ Usage:
 	context := struct {
 		Confirm string
 		OutPath string
-		Fonts   []FontSpec
+		Fonts   []font.FontSpec
 	}{confirm, outPath, fonts()}
 	err := t.Execute(os.Stdout, context)
 	if err != nil {
