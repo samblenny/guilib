@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"guilib/codegen/font"
 	"image/png"
 	"os"
+	"path"
 	"strings"
 	"text/template"
 )
@@ -53,7 +55,6 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 `, "\n")
 	t := template.Must(template.New("usage").Parse(templateString))
 	for _, f := range fonts() {
-		fmt.Println("=======================================================")
 		var data string
 		var index string
 		switch f.Name {
@@ -74,10 +75,15 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 			Index   string
 			Data    string
 		}{f, outPath, index, data}
-		err := t.Execute(os.Stdout, context)
+		var buf bytes.Buffer
+		err := t.Execute(&buf, context)
 		if err != nil {
 			panic(err)
 		}
+		// Write the file
+		op := path.Join(outPath, f.RustOut)
+		fmt.Println("Writing to", op)
+		ioutil.WriteFile(op, buf.Bytes(), 0644)
 	}
 }
 
@@ -160,6 +166,7 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 	if err != nil {
 		panic("unable to decode png file")
 	}
+	pngFile.Close()
 	var dataBuf []uint32
 	var dataBufRust string
 	for _, cs := range font.SysLatinMap() {
@@ -177,7 +184,7 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 		dataBuf = append(dataBuf, blitPattern...)
 		comment := fmt.Sprintf("[%d]: %X '%s'", headerIndex, cs.Codepoint, cs.Chr)
 		if block == font.PRIVATE_USE_AREA {
-			comment = fmt.Sprintf("[%d]: %x %s", headerIndex, cs.Codepoint, cs.Chr)
+			comment = fmt.Sprintf("[%d]: %X %s", headerIndex, cs.Codepoint, cs.Chr)
 		}
 		rustCode := font.ConvertPatternToRust(blitPattern, comment)
 		dataBufRust += rustCode

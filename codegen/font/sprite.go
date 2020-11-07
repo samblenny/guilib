@@ -122,10 +122,12 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 		if col == 0 && row >= 5 && row <= 9 {
 			return [4]int{7, 5, 6, 4}
 		}
+    }
+	if font.Name == "Bold" || font.Name == "Regular" || font.Name == "Small" {
 		// Space gets 4px width and 2px height
 		if col == 2 && row == 0 {
-			lr := (font.Size - 3) / 2
-			tb := (font.Size - 5) / 2
+			lr := (font.Size / 2) - 2
+			tb := (font.Size / 2) - 1
 			return [4]int{tb, lr, tb, lr}
 		}
 	}
@@ -153,6 +155,8 @@ func ConvertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 		for x := uint32(0); x < patW; x++ {
 			if pxMatrix[y][patW-1-x] > 0 {
 				bufWord = (bufWord << 1) | 1
+			} else {
+				bufWord = (bufWord << 1)
 			}
 			flushed = false
 			if (y*patW+x)%32 == 31 {

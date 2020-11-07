@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 //! Regular Font
+//
+// This code incorporates glyphs from the Geneva bitmap typeface which was
+// designed by Susan Kare and released by Apple in 1984. Geneva is a registered
+// trademark of Apple Inc.
 
 /// Return offset into DATA[] for start of pattern depicting glyph for character c
 pub fn get_glyph_pattern_offset(c: char) -> usize {
@@ -23,7 +27,7 @@ const BASIC_LATIN: [u16; 95] = [
     13, // '$'
     21, // '%'
     30, // '&'
-    40, // '''
+    40, // '\''
     42, // '('
     48, // ')'
     54, // '*'
@@ -76,7 +80,7 @@ const BASIC_LATIN: [u16; 95] = [
     384, // 'Y'
     391, // 'Z'
     398, // '['
-    402, // '\'
+    402, // '\\'
     410, // ']'
     414, // '^'
     417, // '_'
@@ -115,7 +119,7 @@ const BASIC_LATIN: [u16; 95] = [
 
 // Index to Unicode Latin 1 block glyph patterns
 const LATIN_1: [u16; 96] = [
-    606, // ' '
+    606, // ' '
     608, // '¡'
     611, // '¢'
     618, // '£'
@@ -479,7 +483,7 @@ pub const DATA: [u32; 1563] = [
     0x00061604, 0x0c330c30, 0xc30c30cc, 0x3030c30c, 0x30c30c0c, 0x30000000,
     // [603]: 7E '~'
     0x000c0406, 0xc3cc3c3c, 0x33c30000,
-    // [606]: A0 ' '
+    // [606]: A0 ' '
     0x0004020e, 0x00000000,
     // [608]: A1 '¡'
     0x00021206, 0xf0ffffff, 0xf0000000,

@@ -53,7 +53,7 @@ func SysLatinMap() []CharSpec {
 		CharSpec{0x24, 4, 2, "$"},
 		CharSpec{0x25, 5, 2, "%"},
 		CharSpec{0x26, 6, 2, "&"},
-		CharSpec{0x27, 7, 2, "'"},
+		CharSpec{0x27, 7, 2, "\\'"},
 		CharSpec{0x28, 8, 2, "("},
 		CharSpec{0x29, 9, 2, ")"},
 		CharSpec{0x2A, 10, 2, "*"},
@@ -106,7 +106,7 @@ func SysLatinMap() []CharSpec {
 		CharSpec{0x59, 9, 5, "Y"},
 		CharSpec{0x5A, 10, 5, "Z"},
 		CharSpec{0x5B, 11, 5, "["},
-		CharSpec{0x5C, 12, 5, "\\"},
+		CharSpec{0x5C, 12, 5, "\\\\"},
 		CharSpec{0x5D, 13, 5, "]"},
 		CharSpec{0x5E, 14, 5, "^"},
 		CharSpec{0x5F, 15, 5, "_"},
@@ -143,7 +143,7 @@ func SysLatinMap() []CharSpec {
 		CharSpec{0x7E, 14, 7, "~"},
 
 		// Unicode Latin 1 block
-		CharSpec{0xA0, 0, 2, "\xA0"}, // No-Break Space
+		CharSpec{0xA0, 0, 2, "\u00A0"}, // No-Break Space
 		CharSpec{0xA1, 1, 12, "¡"},
 		CharSpec{0xA2, 2, 10, "¢"},
 		CharSpec{0xA3, 3, 10, "£"},
@@ -156,7 +156,7 @@ func SysLatinMap() []CharSpec {
 		CharSpec{0xAA, 11, 11, "ª"},
 		CharSpec{0xAB, 7, 12, "«"},
 		CharSpec{0xAC, 2, 12, "¬"},
-		CharSpec{0xAD, 13, 2, "\xAD"}, // Soft Hyphen
+		CharSpec{0xAD, 13, 2, "\u00AD"}, // Soft Hyphen
 		CharSpec{0xAE, 8, 10, "®"},
 		CharSpec{0xAF, 8, 15, "¯"}, // Macron
 		CharSpec{0xB0, 1, 10, "°"}, // Degree Sign

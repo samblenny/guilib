@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 //! Bold Font
+//
+// This code incorporates glyphs from the Chicago bitmap typeface which was
+// designed by Susan Kare and released by Apple in 1984. Chicago is a registered
+// trademark of Apple Inc.
 
 /// Return offset into DATA[] for start of pattern depicting glyph for character c
 pub fn get_glyph_pattern_offset(c: char) -> usize {
@@ -23,7 +27,7 @@ const BASIC_LATIN: [u16; 95] = [
     18, // '$'
     26, // '%'
     39, // '&'
-    49, // '''
+    49, // '\''
     51, // '('
     57, // ')'
     63, // '*'
@@ -76,7 +80,7 @@ const BASIC_LATIN: [u16; 95] = [
     407, // 'Y'
     415, // 'Z'
     423, // '['
-    429, // '\'
+    429, // '\\'
     437, // ']'
     443, // '^'
     446, // '_'
@@ -115,7 +119,7 @@ const BASIC_LATIN: [u16; 95] = [
 
 // Index to Unicode Latin 1 block glyph patterns
 const LATIN_1: [u16; 96] = [
-    659, // ' '
+    659, // ' '
     661, // '¡'
     665, // '¢'
     671, // '£'
@@ -481,7 +485,7 @@ pub const DATA: [u32; 1652] = [
     0x00061604, 0x0c330c30, 0xc30c30cc, 0x3030c30c, 0x30c30c0c, 0x30000000,
     // [656]: 7E '~'
     0x000c040a, 0xc3cc3c3c, 0x33c30000,
-    // [659]: A0 ' '
+    // [659]: A0 ' '
     0x0004020e, 0x00000000,
     // [661]: A1 '¡'
     0x00041206, 0xffff00ff, 0xffffffff, 0xff000000,
