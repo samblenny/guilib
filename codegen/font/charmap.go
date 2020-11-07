@@ -24,19 +24,19 @@ type CharSpec struct {
 // Convert Unicode codepoint to its block and index from the start of that block
 func BlockAndIndex(c uint32) (block UnicodeBlock, index uint32) {
 	if 0x20 <= c && c <= 0x7E {
-		block, index = BASIC_LATIN, c - uint32(0x20)
+		block, index = BASIC_LATIN, c-uint32(0x20)
 	} else if 0xA0 <= c && c <= 0xFF {
-		block, index = LATIN_1, c - uint32(0xA0)
+		block, index = LATIN_1, c-uint32(0xA0)
 	} else if 0x152 <= c && c <= 0x153 {
-		block, index = LATIN_EXTENDED_A, c - uint32(0x152)
+		block, index = LATIN_EXTENDED_A, c-uint32(0x152)
 	} else if 0x2018 <= c && c <= 0x2022 {
-		block, index = GENERAL_PUNCTUATION, c - uint32(0x2018)
+		block, index = GENERAL_PUNCTUATION, c-uint32(0x2018)
 	} else if 0x20AC <= c && c <= 0x20AC {
-		block, index = CURRENCY_SYMBOLS, c - uint32(0x20AC)
+		block, index = CURRENCY_SYMBOLS, c-uint32(0x20AC)
 	} else if 0xE700 <= c && c <= 0xE70C {
-		block, index = PRIVATE_USE_AREA, c - uint32(0xE700)
+		block, index = PRIVATE_USE_AREA, c-uint32(0xE700)
 	} else if 0xFFFD <= c && c <= 0xFFFD {
-		block, index = SPECIALS, c - uint32(0xFFFD)
+		block, index = SPECIALS, c-uint32(0xFFFD)
 	} else {
 		block, index = UNKNOWN, uint32(0)
 	}

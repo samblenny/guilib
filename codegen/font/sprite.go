@@ -41,7 +41,7 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 		var row MatrixRow
 		for x := border + (col * gridSize); x < (col+1)*gridSize; x++ {
 			r, _, _, _ := img.At(x, y).RGBA()
-            //fmt.Println(r, g, b, a)
+			//fmt.Println(r, g, b, a)
 			if r == 0 {
 				row = append(row, 1)
 			} else {
@@ -51,20 +51,21 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 		pxMatrix = append(pxMatrix, row)
 	}
 	// Trim left whitespace
+	trblTrimLimit := trimLimits(font, row, col)
 	pxMatrix = matrixTranspose(pxMatrix)
-	pxMatrix = trimLeadingEmptyRows(pxMatrix)
+	pxMatrix = trimLeadingEmptyRows(pxMatrix, trblTrimLimit[3])
 	// Trim right whitespace
 	pxMatrix = reverseRows(pxMatrix)
-	pxMatrix = trimLeadingEmptyRows(pxMatrix)
+	pxMatrix = trimLeadingEmptyRows(pxMatrix, trblTrimLimit[1])
 	pxMatrix = reverseRows(pxMatrix)
 	pxMatrix = matrixTranspose(pxMatrix)
 	// Trim top whitespace and calculate y-offset
 	preTrimH := len(pxMatrix)
-	pxMatrix = trimLeadingEmptyRows(pxMatrix)
+	pxMatrix = trimLeadingEmptyRows(pxMatrix, trblTrimLimit[0])
 	yOffset := preTrimH - len(pxMatrix)
 	// Trim bottom whitespace
 	pxMatrix = reverseRows(pxMatrix)
-	pxMatrix = trimLeadingEmptyRows(pxMatrix)
+	pxMatrix = trimLeadingEmptyRows(pxMatrix, trblTrimLimit[2])
 	pxMatrix = reverseRows(pxMatrix)
 	// Return matrix and yOffset
 	return pxMatrix, uint32(yOffset)
@@ -72,25 +73,18 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 
 // Return glyph as text with one ASCII char per pixel
 func ConvertMatrixToText(matrix Matrix, yOffset uint32) string {
-    var ascii string
-//    w := len(matrix[0])
-//    for row := uint32(0); row < yOffset; row++ {
-//        for px := 0; px < w; px++ {
-//            ascii += "."
-//        }
-//        ascii += "\n"
-//    }
-    for _, row := range matrix {
-        for _, px := range row {
-            if px == 1 {
-                ascii += "#"
-            } else {
-                ascii += "."
-            }
-        }
-        ascii += "\n"
-    }
-    return ascii
+	var ascii string
+	for _, row := range matrix {
+		for _, px := range row {
+			if px == 1 {
+				ascii += "#"
+			} else {
+				ascii += "."
+			}
+		}
+		ascii += "\n"
+	}
+	return ascii
 }
 
 // Reverse the order of rows in a matrix
@@ -103,8 +97,10 @@ func reverseRows(src Matrix) Matrix {
 }
 
 // Trim whitespace rows from top of matrix
-func trimLeadingEmptyRows(pxMatrix Matrix) Matrix {
-    limit := len(pxMatrix)
+func trimLeadingEmptyRows(pxMatrix Matrix, limit int) Matrix {
+	if len(pxMatrix) < 1 {
+		return pxMatrix
+	}
 	for i := 0; i < limit; i++ {
 		sum := 0
 		for _, n := range pxMatrix[0] {
@@ -117,6 +113,24 @@ func trimLeadingEmptyRows(pxMatrix Matrix) Matrix {
 		}
 	}
 	return pxMatrix
+}
+
+// Look up trim limits based on row & column in glyph grid
+func trimLimits(font FontSpec, row int, col int) [4]int {
+	if font.Name == "Bold" || font.Name == "Regular" {
+		// Radio strength bars get trimmed to match bounds of three bars
+		if col == 0 && row >= 5 && row <= 9 {
+			return [4]int{7, 5, 6, 4}
+		}
+		// Space gets 4px width and 2px height
+		if col == 2 && row == 0 {
+			lr := (font.Size - 3) / 2
+			tb := (font.Size - 5) / 2
+			return [4]int{tb, lr, tb, lr}
+		}
+	}
+	// Everthing else gets max trim
+	return [4]int{font.Size, font.Size, font.Size, font.Size}
 }
 
 // Return pixel matrix as pattern packed into a byte array
@@ -176,7 +190,7 @@ func ConvertPatternToRust(pattern BlitPattern, comment string) string {
 			patternStr += "\n    "
 		}
 	}
-    patternStr += "\n"
+	patternStr += "\n"
 	return patternStr
 }
 

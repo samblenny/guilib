@@ -141,8 +141,7 @@ const SPECIALS: [u16; {{len .Specials}}] = [
 `)
 	dataBufTemplate := strings.TrimSpace(`
 pub const DATA: [u32; {{.DataBufLen}}] = [
-{{.DataBufRust}}
-];
+{{.DataBufRust}}];
 `)
 	// Arrays for compiling codepoint to blit pattern lookup tables
 	var basicLatin CpToBlitList         // Block:     00..7E; Subset:     20..7E
@@ -166,13 +165,17 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 	for _, cs := range font.SysLatinMap() {
 		// ID unicode block for this character
 		block, _ := font.BlockAndIndex(cs.Codepoint)
+		if block == font.PRIVATE_USE_AREA && fs.Name != "Bold" && fs.Name != "Regular" {
+			// Skip PUA block glyphs for fonts that don't include them
+			continue
+		}
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
 		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
-		fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
+		//fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
 		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
 		headerIndex := uint32(len(dataBuf))
 		dataBuf = append(dataBuf, blitPattern...)
-		comment := fmt.Sprintf("[%d]: %x '%s'", headerIndex, cs.Codepoint, cs.Chr)
+		comment := fmt.Sprintf("[%d]: %X '%s'", headerIndex, cs.Codepoint, cs.Chr)
 		if block == font.PRIVATE_USE_AREA {
 			comment = fmt.Sprintf("[%d]: %x %s", headerIndex, cs.Codepoint, cs.Chr)
 		}
@@ -243,7 +246,13 @@ type CpToBlitList []CpToBlit
 func (ctbList CpToBlitList) FormatRustCode() string {
 	var rustCode []string
 	for _, ctb := range ctbList {
-		rustCode = append(rustCode, fmt.Sprintf("%d, // '%s'", ctb.DataIndex, ctb.CS.Chr))
+		block, _ := font.BlockAndIndex(ctb.CS.Codepoint)
+		if block != font.PRIVATE_USE_AREA {
+			rustCode = append(rustCode, fmt.Sprintf("%d, // '%s'", ctb.DataIndex, ctb.CS.Chr))
+		} else {
+			// PUA block chars have descriptions in ctb.CS.Chr, so omit quotes in comment
+			rustCode = append(rustCode, fmt.Sprintf("%d, // %s", ctb.DataIndex, ctb.CS.Chr))
+		}
 	}
 	return strings.Join(rustCode, "\n    ")
 }
