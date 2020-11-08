@@ -122,7 +122,7 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 		if col == 0 && row >= 5 && row <= 9 {
 			return [4]int{7, 5, 6, 4}
 		}
-    }
+	}
 	if font.Name == "Bold" || font.Name == "Regular" || font.Name == "Small" {
 		// Space gets 4px width and 2px height
 		if col == 2 && row == 0 {

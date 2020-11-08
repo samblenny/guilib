@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"guilib/codegen/font"
 	"image/png"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
