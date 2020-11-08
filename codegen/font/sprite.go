@@ -140,8 +140,20 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 //         | (height of blit pattern in px for trimmed glyph as u8) << 8)
 //         | (number of blank rows trimmed from top of glyph as u8)
 // pat[1:(1+ceiling(w*h/32))]: 1-bit pixels packed into u32 words
-// Pixel bits are stored as a background/foreground mask for use with XOR blit.
-// Pixel bit value of 0 means background. Pixel value of 1 means foreground.
+//
+// Pixel bit values are intended as a background/foreground mask for use with
+// XOR blit. Color palette is not set. Rather, palette depends on contents of
+// whatever bitmap the blit pattern gets XOR'ed with.
+//
+// Meaning of pixel bit values in blit pattern:
+// - bit=0: keep color of pixel from background bitmap
+// - bit=1: invert color of pixel from background bitmap
+//
+// Pixel packing happens in row-major order (first left to right, then top to
+// bottom) with the glyph's top-left pixel placed in the most significant bit
+// of the first pixel word. Patterns that need padding because their size is
+// not a multiple of 32 bits (width*height % 32 != 0) get padded with zeros in
+// the least significant bits of the last word.
 func ConvertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 	// Pack trimmed pattern into a byte array
 	patW := uint32(0)
