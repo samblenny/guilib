@@ -12,8 +12,6 @@ import (
 	"text/template"
 )
 
-type CharSpec font.CharSpec
-
 // Path for output files with generated font code
 const outPath = "../src/fonts"
 
@@ -87,14 +85,14 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 	}
 }
 
-// Generate rust code for emoji glyphs packed as [u32] along with corresponding index
+// Generate rust code fragments for emoji glyph blit pattern data and grapheme cluster to pattern index
 func emojiIndexData(font font.FontSpec) (index, data string) {
 	index = "/* TODO: Emoji index */"
 	data = "/* TODO: Emoji data */"
 	return
 }
 
-// Generate rust code for sysLatin glyphs packed as [u32] along with corresponding index
+// Generate rust code fragments for sysLatin glyph blit pattern data and grapheme cluster to pattern index
 func sysLatinIndexData(fs font.FontSpec, hasPUA bool) (index, data string) {
 	indexTemplate := strings.TrimSpace(`
 /// Return offset into DATA[] for start of pattern depicting glyph for character c
@@ -307,7 +305,9 @@ const twemoji = `// This code includes modified versions of graphics from the tw
 //
 // - Twemoji License Notice
 //   > Copyright 2019 Twitter, Inc and other contributors
+//   >
 //   > Code licensed under the MIT License: http://opensource.org/licenses/MIT
+//   >
 //   > Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
 //
 // - Twemoji Source Code Link:

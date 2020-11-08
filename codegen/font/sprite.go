@@ -131,15 +131,17 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 			return [4]int{tb, lr, tb, lr}
 		}
 	}
-	// Everthing else gets max trim
+	// Everything else gets max trim
 	return [4]int{font.Size, font.Size, font.Size, font.Size}
 }
 
-// Return pixel matrix as pattern packed into a byte array
-// pat[0]: pattern width in px
-// pat[1]: pattern height in px
-// pat[2]: y-offset from top of line (position properly relative to text baseline)
-// pat[3:2+w*h/8]: pixels packed into bytes
+// Return pixel matrix as pattern packed into a [u32] array.
+// pat[0]: ((width of blit pattern in px for trimmed glyph as u8) << 16)
+//         | (height of blit pattern in px for trimmed glyph as u8) << 8)
+//         | (number of blank rows trimmed from top of glyph as u8)
+// pat[1:(1+ceiling(w*h/32))]: 1-bit pixels packed into u32 words
+// Pixel bits are stored as a background/foreground mask for use with XOR blit.
+// Pixel bit value of 0 means background. Pixel value of 1 means foreground.
 func ConvertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 	// Pack trimmed pattern into a byte array
 	patW := uint32(0)
