@@ -33,7 +33,8 @@ diacritics, variant forms, nonspacing joins, etc).
 
 Normally, it is not necessary to re-generate the font files. Possible reasons
 to rebuild the fonts include adding new emoji or support for additional writing
-systems. To run the codegen program, you need a go compiler (see golang.org).
+systems. To run the codegen program, you need a go compiler (see golang.org). To
+rebuild the emoji glyph sheet, refer to https://github.com/samblenny/hd1bemoji
 
 Procedure to update source code for the bitmap fonts:
 
