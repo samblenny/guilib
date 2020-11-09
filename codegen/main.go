@@ -167,8 +167,14 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 	pngFile.Close()
 	var dataBuf []uint32
 	var dataBufRust string
+	// Loop through the big list of []CharSpec structs that map from a
+	// Unicode codepoint to a row and column grid coordinate in the sprite
+	// sheet of glyphs. For each codepoint:
+	// 1. Read the glyph pixels
+	// 2. Pack them into the blit pattern data array
+	// 3. Add an entry to the index array for the corresponding unicode block
 	for _, cs := range font.SysLatinMap() {
-		// ID unicode block for this character
+		// Identify the Unicode block for this character
 		block, _ := font.BlockAndIndex(cs.Codepoint)
 		if block == font.PRIVATE_USE_AREA && fs.Name != "Bold" && fs.Name != "Regular" {
 			// Skip PUA block glyphs for fonts that don't include them
@@ -176,7 +182,12 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 		}
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
 		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
-		//fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
+		// Uncomment the two `fmt...` lines below if you want an ASCII art debug dump of
+		// the blit patterns on stdout. The debug dump can help to find and fix data
+		// entry problems in the []CharSpec character map.
+		//
+		// fmt.Printf("%X: %s\n", cs.Codepoint, cs.Chr)
+		// fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
 		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
 		headerIndex := uint32(len(dataBuf))
 		dataBuf = append(dataBuf, blitPattern...)
