@@ -126,9 +126,12 @@ fn keyboard_key_caps(fb: &mut state::FrameBuf, ctx: &mut state::Context, yr: bli
             // And the current key map gives a label for this key
             // ...then blit the label
             if let kbd::R::C(c) = lut[i] {
-                let w = blit::char_width(c, f);
-                cr.x0 = key_cr.x0 + ((key_cr.x1 - key_cr.x0) >> 1) - (w >> 1);
-                blit::xor_char(&mut fb.buf, cr, c, f);
+                let mut buf = [0; 4];
+                let cluster = c.encode_utf8(&mut buf);
+                if let Ok(w) = blit::glyph_width(cluster, f) {
+                    cr.x0 = key_cr.x0 + ((key_cr.x1 - key_cr.x0) >> 1) - (w >> 1);
+                    let _ = blit::xor_char(&mut fb.buf, cr, cluster, f);
+                }
             } else {
                 let label = match lut[i] {
                     kbd::R::Shift => &"shift",
@@ -191,6 +194,7 @@ enum KeyL {
 const fn keypos(col: usize, row: usize, width: usize) -> KeyL {
     let mut x0 = 1 + (col * KBD_KEY_H);
     if col >= 5 {
+        // Using `if` in `const fn` requires rustc v1.46+
         x0 += 1;
     }
     let mut x1 = x0 + (width * KBD_KEY_H);

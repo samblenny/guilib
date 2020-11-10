@@ -32,7 +32,12 @@ pub struct ClipRegion {
 pub fn string_bold_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
     let f = Font::new(fonts::GlyphSet::Bold);
     for c in s.chars() {
-        cr.x0 += xor_char(fb, cr, c, f);
+        let mut buf = [0; 4];
+        let cluster = c.encode_utf8(&mut buf);
+        // TODO: better fallback (vs. silently ignore) if this glyph is not found
+        if let Ok(glyph_width) = xor_char(fb, cr, cluster, f) {
+            cr.x0 += glyph_width;
+        }
     }
 }
 
@@ -40,7 +45,12 @@ pub fn string_bold_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
 pub fn string_regular_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
     let f = Font::new(fonts::GlyphSet::Regular);
     for c in s.chars() {
-        cr.x0 += xor_char(fb, cr, c, f);
+        let mut buf = [0; 4];
+        let cluster = c.encode_utf8(&mut buf);
+        // TODO: better fallback (vs. silently ignore) if this glyph is not found
+        if let Ok(glyph_width) = xor_char(fb, cr, cluster, f) {
+            cr.x0 += glyph_width;
+        }
     }
 }
 
@@ -48,7 +58,12 @@ pub fn string_regular_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
 pub fn string_small_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
     let f = Font::new(fonts::GlyphSet::Small);
     for c in s.chars() {
-        cr.x0 += xor_char(fb, cr, c, f);
+        let mut buf = [0; 4];
+        let cluster = c.encode_utf8(&mut buf);
+        // TODO: better fallback (vs. silently ignore) if this glyph is not found
+        if let Ok(glyph_width) = xor_char(fb, cr, cluster, f) {
+            cr.x0 += glyph_width;
+        }
     }
 }
 
@@ -56,15 +71,18 @@ pub fn string_small_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
 pub fn string_width(s: &str, f: Font) -> usize {
     let mut w = 0;
     for c in s.chars() {
-        w += char_width(c, f) + 3;
+        let mut buf = [0; 4];
+        let cluster = c.encode_utf8(&mut buf);
+        if let Ok(gw) = glyph_width(cluster, f) {
+            w += gw + 3;
+        }
     }
     // Subtle padding math: 3px between chars, 1px at left and right ends
     w - 1
 }
 
 /// Blit a char with: XOR, align left:xr.0 top:yr.0, pad L:1px R:2px
-/// Precondition: glyph pattern width must be 32px or less
-/// Return: width in pixels of character + padding that were blitted (0 for error)
+/// Return: width in pixels of character + padding that were blitted (0 if won't fit in clip region)
 ///
 /// Examples of word alignment for source data (rows of glpyh pixels)
 /// 1. Fits in one word:
@@ -86,16 +104,18 @@ pub fn string_width(s: &str, f: Font) -> usize {
 /// 1. Fits in word: xr:1..7   => (data[0].bit_30)->(data[0].bit_26), mask:0x7c00_0000
 /// 2. Spans words:  xr:30..36 => (data[0].bit_01)->(data[1].bit_29), mask:[0x0000_0003,0xe000_000]
 ///
-pub fn xor_char(fb: &mut LcdFB, cr: ClipRegion, c: char, f: Font) -> usize {
+pub fn xor_char(
+    fb: &mut LcdFB,
+    cr: ClipRegion,
+    cluster: &str,
+    f: Font,
+) -> Result<usize, fonts::GlyphNotFound> {
     if cr.y1 > LCD_LINES || cr.x1 > LCD_PX_PER_LINE || cr.x0 >= cr.x1 {
-        return 0;
+        return Ok(0);
     }
-    // Look up glyph and unpack its header
-    let gpo = (f.glyph_pattern_offset)(c);
+    // Look up glyph for grapheme cluster and unpack its header
+    let gpo = (f.glyph_pattern_offset)(cluster)?;
     let gh = GlyphHeader::new((f.glyph_data)(gpo));
-    if gh.w > 32 {
-        return 0;
-    }
     // Add 1px pad to left
     let x0 = cr.x0 + 1;
     // Calculate word alignment for destination buffer
@@ -138,14 +158,14 @@ pub fn xor_char(fb: &mut LcdFB, cr: ClipRegion, c: char, f: Font) -> usize {
         }
     }
     let width_of_blitted_pixels = (x0 + gh.w + 2) - cr.x0;
-    return width_of_blitted_pixels;
+    return Ok(width_of_blitted_pixels);
 }
 
-/// Calculate the width of glpyh for a char
-pub fn char_width(c: char, f: Font) -> usize {
-    let gpo = (f.glyph_pattern_offset)(c);
+/// Calculate the width of glpyh for a grapheme cluster
+pub fn glyph_width(cluster: &str, f: Font) -> Result<usize, fonts::GlyphNotFound> {
+    let gpo = (f.glyph_pattern_offset)(cluster)?;
     let gh = GlyphHeader::new((f.glyph_data)(gpo));
-    gh.w
+    Ok(gh.w)
 }
 
 /// Clear a screen region bounded by (cr.x0,cr.y0)..(cr.x0,cr.y1)

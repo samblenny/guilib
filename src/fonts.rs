@@ -1,6 +1,15 @@
+/// This code includes an adaptation of the the murmur3 hash algorithm.
+/// The murmur3 public domain notice, as retrieved on August 3, 2020 from
+/// https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp, states:
+///
+/// > MurmurHash3 was written by Austin Appleby, and is placed in the public
+/// > domain. The author hereby disclaims copyright to this source code.
+///
 pub mod bold;
 pub mod regular;
 pub mod small;
+
+use core::fmt;
 
 /// Strings with Unicode Private Use Area characters for UI Sprites
 pub mod pua {
@@ -42,27 +51,36 @@ pub enum GlyphSet {
     Small,
 }
 
+/// Error type for when a font has no glyph to match a grapheme cluster query
+#[derive(Debug, Clone)]
+pub struct GlyphNotFound;
+impl fmt::Display for GlyphNotFound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Font has no glyph for requested grapheme cluster")
+    }
+}
+
 /// Abstraction for working with typeface glyph sets
 #[derive(Copy, Clone)]
 pub struct Font {
     pub glyph_pattern_offset: GlyphPatternOffsetFnPtr,
     pub glyph_data: GlyphDataFnPtr,
 }
-pub type GlyphPatternOffsetFnPtr = fn(char) -> usize;
+pub type GlyphPatternOffsetFnPtr = fn(&str) -> Result<usize, GlyphNotFound>;
 pub type GlyphDataFnPtr = fn(usize) -> u32;
 impl Font {
     pub fn new(gs: GlyphSet) -> Font {
         match gs {
             GlyphSet::Bold => Font {
-                glyph_pattern_offset: bold::get_glyph_pattern_offset,
+                glyph_pattern_offset: bold::get_blit_pattern_offset,
                 glyph_data: bold_data,
             },
             GlyphSet::Regular => Font {
-                glyph_pattern_offset: regular::get_glyph_pattern_offset,
+                glyph_pattern_offset: regular::get_blit_pattern_offset,
                 glyph_data: regular_data,
             },
             GlyphSet::Small => Font {
-                glyph_pattern_offset: small::get_glyph_pattern_offset,
+                glyph_pattern_offset: small::get_blit_pattern_offset,
                 glyph_data: small_data,
             },
         }
@@ -82,4 +100,29 @@ pub fn regular_data(index: usize) -> u32 {
 /// Get word of packed glyph data for small
 pub fn small_data(index: usize) -> u32 {
     small::DATA[index]
+}
+
+/// Return Murmur3 hash function of a string using each char as a u32 block.
+/// Fonts use this to hash grapheme clusters from &str into u32.
+pub fn murmur3(key: &str, seed: u32) -> u32 {
+    let mut h = seed;
+    let mut k;
+    // Hash each character as its own u32 block
+    for c in key.chars() {
+        k = c as u32;
+        k = k.wrapping_mul(0xcc9e2d51);
+        k = k.rotate_left(15);
+        k = k.wrapping_mul(0x1b873593);
+        h ^= k;
+        h = h.rotate_left(13);
+        h = h.wrapping_mul(5);
+        h = h.wrapping_add(0xe6546b64);
+    }
+    h ^= key.bytes().count() as u32;
+    // Finalize with avalanche
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x85ebca6b);
+    h ^= h >> 13;
+    h = h.wrapping_mul(0xc2b2ae35);
+    h ^ (h >> 16)
 }

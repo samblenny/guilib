@@ -15,30 +15,30 @@ const (
 )
 
 type CharSpec struct {
-	Codepoint uint32
-	Row       int
-	Col       int
-	Chr       string
+	FirstCodepoint  uint32
+	Row             int
+	Col             int
+	GraphemeCluster string
 }
 
-// Convert Unicode codepoint to its block and index from the start of that block
-func BlockAndIndex(c uint32) (block UnicodeBlock, index uint32) {
-	if 0x20 <= c && c <= 0x7E {
-		block, index = BASIC_LATIN, c-uint32(0x20)
-	} else if 0xA0 <= c && c <= 0xFF {
-		block, index = LATIN_1, c-uint32(0xA0)
-	} else if 0x152 <= c && c <= 0x153 {
-		block, index = LATIN_EXTENDED_A, c-uint32(0x152)
-	} else if 0x2018 <= c && c <= 0x2022 {
-		block, index = GENERAL_PUNCTUATION, c-uint32(0x2018)
-	} else if 0x20AC <= c && c <= 0x20AC {
-		block, index = CURRENCY_SYMBOLS, c-uint32(0x20AC)
+// Convert Unicode codepoint to its block
+func Block(c uint32) (block UnicodeBlock) {
+	if 0x00 <= c && c <= 0x7E {
+		block = BASIC_LATIN
+	} else if 0x80 <= c && c <= 0xFF {
+		block = LATIN_1
+	} else if 0x100 <= c && c <= 0x17F {
+		block = LATIN_EXTENDED_A
+	} else if 0x2000 <= c && c <= 0x206F {
+		block = GENERAL_PUNCTUATION
+	} else if 0x20A0 <= c && c <= 0x20CF {
+		block = CURRENCY_SYMBOLS
 	} else if 0xE700 <= c && c <= 0xE70C {
-		block, index = PRIVATE_USE_AREA, c-uint32(0xE700)
-	} else if 0xFFFD <= c && c <= 0xFFFD {
-		block, index = SPECIALS, c-uint32(0xFFFD)
+		block = PRIVATE_USE_AREA
+	} else if 0xFFFD == c {
+		block = SPECIALS
 	} else {
-		block, index = UNKNOWN, uint32(0)
+		block = UNKNOWN
 	}
 	return
 }

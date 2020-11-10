@@ -6,8 +6,10 @@ import (
 	"guilib/codegen/font"
 	"image/png"
 	"io/ioutil"
+	"math/bits"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"text/template"
 )
@@ -32,47 +34,32 @@ func codegen() {
 //! {{.Font.Name}} Font
 //
 {{.Font.Legal}}
-
-{{.Index}}
-
 /// Maximum height of glyph patterns in this bitmap typeface.
-/// This will be true: h + yOffset <= MAX_HEIGHT
+/// This will be true: h + y_offset <= MAX_HEIGHT
 pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 
-/// Packed glyph pattern data.
-/// Record format:
-///  [offset+0]: ((w as u8) << 16) | ((h as u8) << 8) | (yOffset as u8)
-///  [offset+1..=ceil(w*h/32)]: packed 1-bit pixels; 0=clear, 1=set
-/// Pixels are packed in top to bottom, left to right order with MSB of first
-/// pixel word containing the top left pixel.
-///  w: Width of pattern in pixels
-///  h: Height of pattern in pixels
-///  yOffset: Vertical offset (pixels downward from top of line) to position
-///     glyph pattern properly relative to text baseline
 {{.Data}}
 `, "\n")
 	t := template.Must(template.New("usage").Parse(templateString))
 	for _, f := range fonts() {
 		var data string
-		var index string
 		switch f.Name {
 		case "Emoji":
-			index, data = emojiIndexData(f)
+			data = emojiData(f)
 		case "Bold":
-			index, data = sysLatinIndexData(f, true)
+			data = sysLatinData(f, true)
 		case "Regular":
-			index, data = sysLatinIndexData(f, true)
+			data = sysLatinData(f, true)
 		case "Small":
-			index, data = sysLatinIndexData(f, false)
+			data = sysLatinData(f, false)
 		default:
 			panic("unexpected FontSpec.Name")
 		}
 		context := struct {
 			Font    font.FontSpec
 			OutPath string
-			Index   string
 			Data    string
-		}{f, outPath, index, data}
+		}{f, outPath, data}
 		var buf bytes.Buffer
 		err := t.Execute(&buf, context)
 		if err != nil {
@@ -85,76 +72,74 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 	}
 }
 
-// Generate rust code fragments for emoji glyph blit pattern data and grapheme cluster to pattern index
-func emojiIndexData(font font.FontSpec) (index, data string) {
-	index = "/* TODO: Emoji index */"
-	data = "/* TODO: Emoji data */"
-	return
+// Generate rust code for emoji glyph blit pattern and grapheme cluster index data
+func emojiData(font font.FontSpec) string {
+	data := "/* TODO: Emoji data */"
+	return data
 }
 
-// Generate rust code fragments for sysLatin glyph blit pattern data and grapheme cluster to pattern index
-func sysLatinIndexData(fs font.FontSpec, hasPUA bool) (index, data string) {
-	indexTemplate := strings.TrimSpace(`
-/// Return offset into DATA[] for start of pattern depicting glyph for character c
-pub fn get_glyph_pattern_offset(c: char) -> usize {
-    match c as u32 {
-        0x20..=0x7E => BASIC_LATIN[(c as usize) - 0x20] as usize,
-        0xA0..=0xFF => LATIN_1[(c as usize) - 0xA0] as usize,
-        0x152..=0x153 => LATIN_EXTENDED_A[(c as usize) - 0x152] as usize,
-        0x2018..=0x2022 => GENERAL_PUNCTUATION[(c as usize) - 0x2018] as usize,
-        0x20AC..=0x20AC => CURRENCY_SYMBOLS[(c as usize) - 0x20AC] as usize,{{if gt (len .PrivateUseArea) 0}}
-        0xE700..=0xE70C => PRIVATE_USE_AREA[(c as usize) - 0xE700] as usize,{{end}}
-        _ => SPECIALS[(0xFFFD as usize) - 0xFFFD] as usize,
+// Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
+func sysLatinData(fs font.FontSpec, hasPUA bool) string {
+	dataTemplate := strings.TrimSpace(`
+/// Return Okay(offset into DATA[]) for start of blit pattern for grapheme cluster.
+///
+/// Before doing an expensive lookup for the whole cluster, this does a pre-filter
+/// check to see whether the first character falls into one of the codepoint ranges
+/// for Unicode blocks included in this font.
+///
+pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFound> {
+    let first_char: u32;
+    match cluster.chars().next() {
+        Some(c) => first_char = c as u32,
+        None => return Err(super::GlyphNotFound),
+    }
+    return match first_char {
+        0x00..=0x7E        // Basic Latin
+        | 0x80..=0xFF      // Latin 1
+        | 0x100..=0x17F    // Latin Extended A
+        | 0x2000..=0x206F  // General Punctuation
+        | 0x20A0..=0x20CF  // Currency Symbols{{if .PrivateUseArea}}
+        | 0xE700..=0xE70C  // Subset of Private Use Area (UI Icons){{end}}
+        | 0xFFFD => {      // Subset of Specials (replacement character)
+            find_pattern(cluster)
+        }
+        _ => Err(super::GlyphNotFound),
+    };
+}
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster
+fn find_pattern(cluster: &str) -> Result<usize, super::GlyphNotFound> {
+    let seed = 0;
+    let key = super::murmur3(cluster, seed);
+    match HASHED_CLUSTERS.binary_search(&key) {
+        Ok(index) => return Ok(PATTERN_OFFSETS[index]),
+        _ => Err(super::GlyphNotFound),
     }
 }
 
-// Index to Unicode Basic Latin block glyph patterns
-const BASIC_LATIN: [u16; {{len .BasicLatin}}] = [
-    {{.BasicLatin.FormatRustCode}}
+// Index of murmur3(grapheme cluster) with sort order matching PATTERN_OFFSETS
+const HASHED_CLUSTERS: [u32; {{len .COIndex}}] = [
+    {{.COIndex.RustCodeForClusterHashes}}
 ];
 
-// Index to Unicode Latin 1 block glyph patterns
-const LATIN_1: [u16; {{len .Latin1}}] = [
-    {{.Latin1.FormatRustCode}}
+// Lookup table from hashed cluster to blit pattern offset (sort order matches HASHED_CLUSTERS)
+const PATTERN_OFFSETS: [usize; {{len .COIndex}}] = [
+    {{.COIndex.RustCodeForOffsets}}
 ];
 
-// Index to Unicode Latin Extended A block glyph patterns
-const LATIN_EXTENDED_A: [u16; {{len .LatinExtendedA}}] = [
-    {{.LatinExtendedA.FormatRustCode}}
-];
-
-// Index to General Punctuation block glyph patterns
-const GENERAL_PUNCTUATION: [u16; {{len .GeneralPunctuation}}] = [
-    {{.GeneralPunctuation.FormatRustCode}}
-];
-
-// Index to Unicode Currency Symbols block glyph patterns
-const CURRENCY_SYMBOLS: [u16; {{len .CurrencySymbols}}] = [
-    {{.CurrencySymbols.FormatRustCode}}
-];{{if gt (len .PrivateUseArea) 0}}
-
-// Index to Unicode Private Use Area block glyph patterns (UI sprites)
-const PRIVATE_USE_AREA: [u16; {{len .PrivateUseArea}}] = [
-    {{.PrivateUseArea.FormatRustCode}}
-];{{end}}
-
-// Index to Unicode Specials block glyph patterns
-const SPECIALS: [u16; {{len .Specials}}] = [
-    {{.Specials.FormatRustCode}}
-];
-`)
-	dataBufTemplate := strings.TrimSpace(`
+/// Packed glyph pattern data.
+/// Record format:
+///  [offset+0]: ((w as u8) << 16) | ((h as u8) << 8) | (yOffset as u8)
+///  [offset+1..=ceil(w*h/32)]: packed 1-bit pixels; 0=clear, 1=set
+/// Pixels are packed in top to bottom, left to right order with MSB of first
+/// pixel word containing the top left pixel.
+///  w: Width of pattern in pixels
+///  h: Height of pattern in pixels
+///  yOffset: Vertical offset (pixels downward from top of line) to position
+///     glyph pattern properly relative to text baseline
 pub const DATA: [u32; {{.DataBufLen}}] = [
 {{.DataBufRust}}];
 `)
-	// Arrays for compiling codepoint to blit pattern lookup tables
-	var basicLatin CpToBlitList         // Block:     00..7E; Subset:     20..7E
-	var latin1 CpToBlitList             // Block:     80..FF; Subset:     A0..FF
-	var latinExtendedA CpToBlitList     // Block:   100..17F; Subset:   152..153
-	var generalPunctuation CpToBlitList // Block: 2000..206F; Subset: 2018..2022
-	var currencySymbols CpToBlitList    // Block: 20A0..20CF; Subset: 20AC..20AC
-	var privateUseArea CpToBlitList     // Block: E000..F8FF; Subset: E700..E70C
-	var specials CpToBlitList           // Block: FFF0..FFFF; Subset: FFFD..FFFD
 	// Read glyphs from png file
 	pngFile, err := os.Open(fs.Sprites)
 	if err != nil {
@@ -167,18 +152,22 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 	pngFile.Close()
 	var dataBuf []uint32
 	var dataBufRust string
-	// Loop through the big list of []CharSpec structs that map from a
-	// Unicode codepoint to a row and column grid coordinate in the sprite
-	// sheet of glyphs. For each codepoint:
+	var coIndex []ClusterOffsetEntry
+	puaCount := 0
+	// Loop through the big list of []CharSpec structs that map from
+	// grapheme clusters to row and column grid coordinates in the sprite
+	// sheet of glyphs. For each grapheme cluster:
 	// 1. Read the glyph pixels
 	// 2. Pack them into the blit pattern data array
-	// 3. Add an entry to the index array for the corresponding unicode block
+	// 3. Add an entry to the index
 	for _, cs := range font.SysLatinMap() {
-		// Identify the Unicode block for this character
-		block, _ := font.BlockAndIndex(cs.Codepoint)
+		// Identify the Unicode block for this grapheme cluster
+		block := font.Block(cs.FirstCodepoint)
 		if block == font.PRIVATE_USE_AREA && fs.Name != "Bold" && fs.Name != "Regular" {
 			// Skip PUA block glyphs for fonts that don't include them
 			continue
+		} else if block == font.UNKNOWN {
+			panic("character map includes cluster from unknown Unicode block")
 		}
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
 		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
@@ -189,85 +178,95 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 		// fmt.Printf("%X: %s\n", cs.Codepoint, cs.Chr)
 		// fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
 		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
-		headerIndex := uint32(len(dataBuf))
+		dataOffset := len(dataBuf)
 		dataBuf = append(dataBuf, blitPattern...)
-		comment := fmt.Sprintf("[%d]: %X '%s'", headerIndex, cs.Codepoint, cs.Chr)
+		// Subtle point: distinction between cluster vs. clusterLabel
+		// has to do with the way ./font/charmap.go::SysLatinMap()
+		// encodes UI sprites in the PRIVATE USE AREA block. Normally,
+		// CharSpec.GraphemeCluster holds an actual grapheme cluster.
+		// But, the CharSpec structs for UI sprites abuse the field to
+		// store a descriptive label instead. The workaround below is
+		// a way to avoid adding another field to CharSpec. The goal
+		// is to annotate the big const [u32; n] arrays with readable
+		// comments about what all the mysterious int literals mean.
+		// TODO: maybe find a less confusing solution?
+		cluster := cs.GraphemeCluster
+		clusterLabel := cs.GraphemeCluster
+		comment := fmt.Sprintf("[%d]: %X '%s'", dataOffset, cs.FirstCodepoint, cluster)
 		if block == font.PRIVATE_USE_AREA {
-			comment = fmt.Sprintf("[%d]: %X %s", headerIndex, cs.Codepoint, cs.Chr)
+			// For UI sprites, adjust the grapheme cluster string and comment because
+			// cs.GraphemeCluster holds a descriptive label instead of the cluster string
+			cluster = string(rune(cs.FirstCodepoint))
+			comment = fmt.Sprintf("[%d]: %X %s", dataOffset, cs.FirstCodepoint, clusterLabel)
+			puaCount += 1
 		}
 		rustCode := font.ConvertPatternToRust(blitPattern, comment)
 		dataBufRust += rustCode
-		// Update the character index with the correct offset (DATA[n]) for pattern header
-		if block == font.BASIC_LATIN {
-			basicLatin = append(basicLatin, CpToBlit{headerIndex, cs})
-		} else if block == font.LATIN_1 {
-			latin1 = append(latin1, CpToBlit{headerIndex, cs})
-		} else if block == font.LATIN_EXTENDED_A {
-			latinExtendedA = append(latinExtendedA, CpToBlit{headerIndex, cs})
-		} else if block == font.GENERAL_PUNCTUATION {
-			generalPunctuation = append(generalPunctuation, CpToBlit{headerIndex, cs})
-		} else if block == font.CURRENCY_SYMBOLS {
-			currencySymbols = append(currencySymbols, CpToBlit{headerIndex, cs})
-		} else if block == font.PRIVATE_USE_AREA {
-			privateUseArea = append(privateUseArea, CpToBlit{headerIndex, cs})
-		} else if block == font.SPECIALS {
-			specials = append(specials, CpToBlit{headerIndex, cs})
-		} else {
-			panic("unexpected block")
-		}
+		// Update the index with the correct offset (DATA[n]) for pattern header
+		seed := uint32(0)
+		coIndex = append(coIndex, ClusterOffsetEntry{
+			murmur3(cluster, seed),
+			clusterLabel,
+			dataOffset,
+			block == font.PRIVATE_USE_AREA,
+		})
 	}
-	// Render index template
-	indexT := template.Must(template.New("index").Parse(indexTemplate))
-	indexContext := struct {
-		BasicLatin         CpToBlitList
-		Latin1             CpToBlitList
-		LatinExtendedA     CpToBlitList
-		GeneralPunctuation CpToBlitList
-		CurrencySymbols    CpToBlitList
-		PrivateUseArea     CpToBlitList
-		Specials           CpToBlitList
-	}{basicLatin, latin1, latinExtendedA, generalPunctuation, currencySymbols, privateUseArea, specials}
-	var indexStrBuf bytes.Buffer
-	err = indexT.Execute(&indexStrBuf, indexContext)
-	if err != nil {
-		panic(err)
-	}
+	// Sort the index
+	sort.Slice(coIndex, func(i, j int) bool { return coIndex[i].M3Hash < coIndex[j].M3Hash })
 	// Render data template
-	dataT := template.Must(template.New("dataBuf").Parse(dataBufTemplate))
+	dataT := template.Must(template.New("dataBuf").Parse(dataTemplate))
 	dataContext := struct {
-		DataBufRust string
-		DataBufLen  int
-	}{dataBufRust, len(dataBuf)}
+		PrivateUseArea bool
+		DataBufRust    string
+		DataBufLen     int
+		COIndex        ClusterOffsetIndex
+	}{puaCount > 0, dataBufRust, len(dataBuf), coIndex}
 	var dataStrBuf bytes.Buffer
 	err = dataT.Execute(&dataStrBuf, dataContext)
 	if err != nil {
 		panic(err)
 	}
-	// Return
-	index = indexStrBuf.String()
-	data = dataStrBuf.String()
-	return
+	return dataStrBuf.String()
 }
 
-// An element of lookup tables to translate from codepoint block to blit pattern
-type CpToBlit struct {
-	DataIndex uint32
-	CS        font.CharSpec
+// An index entry for translating from grapheme cluster to blit pattern
+type ClusterOffsetEntry struct {
+	M3Hash         uint32
+	ClusterLabel   string
+	DataOffset     int
+	PrivateUseArea bool
 }
 
-// Type for slice of CpToBlit (so they can be used with .FormatRustCode in template strings)
-type CpToBlitList []CpToBlit
+// Type for the index so it can be used with .RustCodeFor* methods in templates
+type ClusterOffsetIndex []ClusterOffsetEntry
 
-// Format the inner elements of a [u16; n] codepoint to blit pattern index translation table
-func (ctbList CpToBlitList) FormatRustCode() string {
+// Format the inner elements of a [u32; n] cluster hash index table
+func (coIndex ClusterOffsetIndex) RustCodeForClusterHashes() string {
 	var rustCode []string
-	for _, ctb := range ctbList {
-		block, _ := font.BlockAndIndex(ctb.CS.Codepoint)
-		if block != font.PRIVATE_USE_AREA {
-			rustCode = append(rustCode, fmt.Sprintf("%d, // '%s'", ctb.DataIndex, ctb.CS.Chr))
+	for _, entry := range coIndex {
+		hash := fmt.Sprintf("0x%08X", entry.M3Hash)
+		clusterLabel := entry.ClusterLabel
+		if !entry.PrivateUseArea {
+			rustCode = append(rustCode, fmt.Sprintf("%s, // '%s'", hash, clusterLabel))
 		} else {
-			// PUA block chars have descriptions in ctb.CS.Chr, so omit quotes in comment
-			rustCode = append(rustCode, fmt.Sprintf("%d, // %s", ctb.DataIndex, ctb.CS.Chr))
+			// PUA block chars have description strings, so format comment without quotes
+			rustCode = append(rustCode, fmt.Sprintf("%s, // %s", hash, clusterLabel))
+		}
+	}
+	return strings.Join(rustCode, "\n    ")
+}
+
+// Format the inner elements of a [u32; n] blit pattern offset table
+func (coIndex ClusterOffsetIndex) RustCodeForOffsets() string {
+	var rustCode []string
+	for _, entry := range coIndex {
+		offset := fmt.Sprintf("%d,", entry.DataOffset)
+		clusterLabel := entry.ClusterLabel
+		if !entry.PrivateUseArea {
+			rustCode = append(rustCode, fmt.Sprintf("%-5s // '%s'", offset, clusterLabel))
+		} else {
+			// PUA block chars have description strings, so format comment without quotes
+			rustCode = append(rustCode, fmt.Sprintf("%-5s // %s", offset, clusterLabel))
 		}
 	}
 	return strings.Join(rustCode, "\n    ")
@@ -297,6 +296,30 @@ Usage:
 	}
 }
 
+// Return Murmur3 hash function of a string using each character as a u32 block
+func murmur3(key string, seed uint32) uint32 {
+	h := seed
+	k := uint32(0)
+	// Hash each codepoint in the string as its own uint32 block
+	for _, c := range key {
+		k = uint32(c)
+		k *= 0xcc9e2d51
+		k = bits.RotateLeft32(k, 15)
+		k *= 0x1b873593
+		h ^= k
+		h = bits.RotateLeft32(h, 13)
+		h *= 5
+		h += 0xe6546b64
+	}
+	h ^= uint32(len(key))
+	// Finalize with avalanche
+	h ^= h >> 16
+	h *= 0x85ebca6b
+	h ^= h >> 13
+	h *= 0xc2b2ae35
+	return h ^ (h >> 16)
+}
+
 // Main: check for confirmation switch before writing files
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == confirm {
@@ -322,12 +345,18 @@ const twemoji = `// This code includes modified versions of graphics from the tw
 //   > Graphics licensed under CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
 //
 // - Twemoji Source Code Link:
-//   https://github.com/twitter/twemoji`
+//   https://github.com/twitter/twemoji
+//
+`
 
 const chicago = `// This code incorporates glyphs from the Chicago bitmap typeface which was
 // designed by Susan Kare and released by Apple in 1984. Chicago is a registered
-// trademark of Apple Inc.`
+// trademark of Apple Inc.
+//
+`
 
 const geneva = `// This code incorporates glyphs from the Geneva bitmap typeface which was
 // designed by Susan Kare and released by Apple in 1984. Geneva is a registered
-// trademark of Apple Inc.`
+// trademark of Apple Inc.
+//
+`
