@@ -329,19 +329,19 @@ func SysLatinMap() []CharSpec {
 		CharSpec{0x20AC, 11, 13, "€"},
 
 		// Unicode Private Use Area assignments for UI sprites
-		CharSpec{0xE700, 0, 0, "Battery_05"},
-		CharSpec{0xE701, 1, 0, "Battery_25"},
-		CharSpec{0xE702, 2, 0, "Battery_50"},
-		CharSpec{0xE703, 3, 0, "Battery_75"},
-		CharSpec{0xE704, 4, 0, "Battery_99"},
-		CharSpec{0xE705, 5, 0, "Radio_3"},
-		CharSpec{0xE706, 6, 0, "Radio_2"},
-		CharSpec{0xE707, 7, 0, "Radio_1"},
-		CharSpec{0xE708, 8, 0, "Radio_0"},
-		CharSpec{0xE709, 9, 0, "Radio_Off"},
-		CharSpec{0xE70A, 13, 0, "Shift_Arrow"},
-		CharSpec{0xE70B, 14, 0, "Backspace_Symbol"},
-		CharSpec{0xE70C, 15, 0, "Enter_Symbol"},
+		CharSpec{0xE700, 0, 0, "\uE700"},  // Battery_05
+		CharSpec{0xE701, 1, 0, "\uE701"},  // Battery_25
+		CharSpec{0xE702, 2, 0, "\uE702"},  // Battery_50
+		CharSpec{0xE703, 3, 0, "\uE703"},  // Battery_75
+		CharSpec{0xE704, 4, 0, "\uE704"},  // Battery_99
+		CharSpec{0xE705, 5, 0, "\uE705"},  // Radio_3
+		CharSpec{0xE706, 6, 0, "\uE706"},  // Radio_2
+		CharSpec{0xE707, 7, 0, "\uE707"},  // Radio_1
+		CharSpec{0xE708, 8, 0, "\uE708"},  // Radio_0
+		CharSpec{0xE709, 9, 0, "\uE709"},  // Radio_Off
+		CharSpec{0xE70A, 13, 0, "\uE70A"}, // Shift_Arrow
+		CharSpec{0xE70B, 14, 0, "\uE70B"}, // Backspace_Symbol
+		CharSpec{0xE70C, 15, 0, "\uE70C"}, // Enter_Symbol
 
 		// Unicode Specials Block
 		CharSpec{0xFFFD, 0, 15, "�"},

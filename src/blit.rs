@@ -58,19 +58,6 @@ pub fn string_regular_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
     }
 }
 
-/// Blit string with: XOR, small font, align xr left yr top
-pub fn string_small_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
-    let f = Font::new(fonts::GlyphSet::Small);
-    for c in s.chars() {
-        let mut buf = [0; 4];
-        let cluster = c.encode_utf8(&mut buf);
-        // TODO: better fallback (vs. silently ignore) if this glyph is not found
-        if let Ok(glyph_width) = xor_char(fb, cr, cluster, f) {
-            cr.x0 += glyph_width;
-        }
-    }
-}
-
 /// Calculate the width of all glpyhs and padding for a string
 pub fn string_width(s: &str, f: Font) -> usize {
     let mut w = 0;

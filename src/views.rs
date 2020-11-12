@@ -57,8 +57,6 @@ pub fn home_screen(fb: &mut state::FrameBuf, ctx: &mut state::Context) {
     cr.y0 += fonts::bold::MAX_HEIGHT as usize;
     blit::string_regular_left(&mut fb.buf, cr, ctx.note);
     cr.y0 += fonts::regular::MAX_HEIGHT as usize;
-    blit::string_small_left(&mut fb.buf, cr, ctx.note);
-    cr.y0 += fonts::small::MAX_HEIGHT as usize * 2;
     blit::string_regular_left(&mut fb.buf, cr, ctx.buffer());
     // Onscreen keyboard
     keyboard(fb, ctx, blit::YRegion(KBD_Y0, KBD_Y1));

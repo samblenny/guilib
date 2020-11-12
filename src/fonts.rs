@@ -11,7 +11,6 @@
 #![forbid(unsafe_code)]
 pub mod bold;
 pub mod regular;
-pub mod small;
 
 use core::fmt;
 
@@ -52,7 +51,6 @@ impl GlyphHeader {
 pub enum GlyphSet {
     Bold,
     Regular,
-    Small,
 }
 
 /// Error type for when a font has no glyph to match a grapheme cluster query
@@ -83,10 +81,6 @@ impl Font {
                 glyph_pattern_offset: regular::get_blit_pattern_offset,
                 glyph_data: regular_data,
             },
-            GlyphSet::Small => Font {
-                glyph_pattern_offset: small::get_blit_pattern_offset,
-                glyph_data: small_data,
-            },
         }
     }
 }
@@ -99,11 +93,6 @@ pub fn bold_data(index: usize) -> u32 {
 /// Get word of packed glyph data for regular
 pub fn regular_data(index: usize) -> u32 {
     regular::DATA[index]
-}
-
-/// Get word of packed glyph data for small
-pub fn small_data(index: usize) -> u32 {
-    small::DATA[index]
 }
 
 /// Return Murmur3 hash function of a string using each char as a u32 block.

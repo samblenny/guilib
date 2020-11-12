@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"guilib/codegen/font"
+	"image"
 	"image/png"
 	"io/ioutil"
 	"math/bits"
@@ -30,7 +31,6 @@ func fonts() []font.FontSpec {
 		font.FontSpec{"Emoji", "img/emoji48x48_o3x0.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
 		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
 		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
-		font.FontSpec{"Small", "img/small.png", 24, 16, 2, 2, geneva, "small.rs"},
 	}
 }
 
@@ -55,11 +55,9 @@ func codegen() {
 		case "Emoji":
 			data = emojiData(f)
 		case "Bold":
-			data = sysLatinData(f, true)
+			data = sysLatinData(f)
 		case "Regular":
-			data = sysLatinData(f, true)
-		case "Small":
-			data = sysLatinData(f, false)
+			data = sysLatinData(f)
 		default:
 			panic("unexpected FontSpec.Name")
 		}
@@ -87,13 +85,12 @@ func emojiData(font font.FontSpec) string {
 }
 
 // Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
-func sysLatinData(fs font.FontSpec, hasPUA bool) string {
+func sysLatinData(fs font.FontSpec) string {
 	// Read glyphs from png file
 	img := readPNGFile(fs.Sprites)
 	var dataBuf []uint32
 	var dataBufRust string
 	var coIndex []ClusterOffsetEntry
-	puaCount := 0
 	// Loop through the big list of []CharSpec structs that map from
 	// grapheme clusters to row and column grid coordinates in the sprite
 	// sheet of glyphs. For each grapheme cluster:
@@ -103,10 +100,7 @@ func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 	for _, cs := range font.SysLatinMap() {
 		// Identify the Unicode block for this grapheme cluster
 		block := font.Block(cs.FirstCodepoint)
-		if block == font.PRIVATE_USE_AREA && fs.Name != "Bold" && fs.Name != "Regular" {
-			// Skip PUA block glyphs for fonts that don't include them
-			continue
-		} else if block == font.UNKNOWN {
+		if block == font.UNKNOWN {
 			fmt.Printf("0x%08X\n", cs.FirstCodepoint)
 			panic("character map includes cluster from unknown Unicode block")
 		}
@@ -121,33 +115,15 @@ func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
 		dataOffset := len(dataBuf)
 		dataBuf = append(dataBuf, blitPattern...)
-		// Subtle point: distinction between cluster vs. clusterLabel
-		// has to do with the way ./font/charmap.go::SysLatinMap()
-		// encodes UI sprites in the PRIVATE USE AREA block. Normally,
-		// CharSpec.GraphemeCluster holds an actual grapheme cluster.
-		// But, the CharSpec structs for UI sprites abuse the field to
-		// store a descriptive label instead. The workaround below is
-		// a way to avoid adding another field to CharSpec. The goal
-		// is to annotate the big const [u32; n] arrays with readable
-		// comments about what all the mysterious int literals mean.
-		// TODO: maybe find a less confusing solution?
-		cluster := cs.GraphemeCluster
-		clusterLabel := cs.GraphemeCluster
-		comment := fmt.Sprintf("[%d]: %X '%s'", dataOffset, cs.FirstCodepoint, cluster)
-		if block == font.PRIVATE_USE_AREA {
-			// For UI sprites, adjust the grapheme cluster string and comment because
-			// cs.GraphemeCluster holds a descriptive label instead of the cluster string
-			cluster = string(rune(cs.FirstCodepoint))
-			comment = fmt.Sprintf("[%d]: %X %s", dataOffset, cs.FirstCodepoint, clusterLabel)
-			puaCount += 1
-		}
+		label := labelForCluster(cs.GraphemeCluster)
+		comment := fmt.Sprintf("[%d]: %X %s", dataOffset, cs.FirstCodepoint, label)
 		rustCode := font.ConvertPatternToRust(blitPattern, comment)
 		dataBufRust += rustCode
 		// Update the index with the correct offset (DATA[n]) for pattern header
 		seed := uint32(0)
 		coIndex = append(coIndex, ClusterOffsetEntry{
-			murmur3(cluster, seed),
-			clusterLabel,
+			murmur3(cs.GraphemeCluster, seed),
+			cs.GraphemeCluster,
 			dataOffset,
 			block == font.PRIVATE_USE_AREA,
 		})
@@ -157,13 +133,12 @@ func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 	// Render data template
 	dataT := template.Must(template.New("dataBuf").Parse(dataTemplate))
 	dataContext := struct {
-		PrivateUseArea bool
-		DataBufRust    string
-		DataBufLen     int
-		COIndex        ClusterOffsetIndex
-	}{puaCount > 0, dataBufRust, len(dataBuf), coIndex}
+		DataBufRust string
+		DataBufLen  int
+		COIndex     ClusterOffsetIndex
+	}{dataBufRust, len(dataBuf), coIndex}
 	var dataStrBuf bytes.Buffer
-	err = dataT.Execute(&dataStrBuf, dataContext)
+	err := dataT.Execute(&dataStrBuf, dataContext)
 	if err != nil {
 		panic(err)
 	}
@@ -171,8 +146,8 @@ func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 }
 
 // Read the specified PNG file and convert its data into an image object
-func readPNGFile(name) image.Image {
-	pngFile, err := os.Open(fs.Sprites)
+func readPNGFile(name string) image.Image {
+	pngFile, err := os.Open(name)
 	if err != nil {
 		panic("unable to open png file")
 	}
@@ -184,13 +159,47 @@ func readPNGFile(name) image.Image {
 	return img
 }
 
+// Make label for grapheme cluster with special handling for UI sprites in PUA block
+func labelForCluster(c string) string {
+	switch c {
+	case "\uE700":
+		return "Battery_05"
+	case "\uE701":
+		return "Battery_25"
+	case "\uE702":
+		return "Battery_50"
+	case "\uE703":
+		return "Battery_75"
+	case "\uE704":
+		return "Battery_99"
+	case "\uE705":
+		return "Radio_3"
+	case "\uE706":
+		return "Radio_2"
+	case "\uE707":
+		return "Radio_1"
+	case "\uE708":
+		return "Radio_0"
+	case "\uE709":
+		return "Radio_Off"
+	case "\uE70A":
+		return "Shift_Arrow"
+	case "\uE70B":
+		return "Backspace_Symbol"
+	case "\uE70C":
+		return "Enter_Symbol"
+	default:
+		return fmt.Sprintf("'%s'", c)
+	}
+}
+
 // Type for the index so it can be used with .RustCodeFor* methods in templates
 type ClusterOffsetIndex []ClusterOffsetEntry
 
 // An index entry for translating from grapheme cluster to blit pattern
 type ClusterOffsetEntry struct {
 	M3Hash         uint32
-	ClusterLabel   string
+	Cluster        string
 	DataOffset     int
 	PrivateUseArea bool
 }
@@ -224,13 +233,8 @@ func (coIndex ClusterOffsetIndex) RustCodeForClusterHashes() string {
 	var rustCode []string
 	for _, entry := range coIndex {
 		hash := fmt.Sprintf("0x%08X", entry.M3Hash)
-		clusterLabel := entry.ClusterLabel
-		if !entry.PrivateUseArea {
-			rustCode = append(rustCode, fmt.Sprintf("%s, // '%s'", hash, clusterLabel))
-		} else {
-			// PUA block chars have description strings, so format comment without quotes
-			rustCode = append(rustCode, fmt.Sprintf("%s, // %s", hash, clusterLabel))
-		}
+		label := labelForCluster(entry.Cluster)
+		rustCode = append(rustCode, fmt.Sprintf("%s, // %s", hash, label))
 	}
 	return strings.Join(rustCode, "\n    ")
 }
@@ -240,13 +244,8 @@ func (coIndex ClusterOffsetIndex) RustCodeForOffsets() string {
 	var rustCode []string
 	for _, entry := range coIndex {
 		offset := fmt.Sprintf("%d,", entry.DataOffset)
-		clusterLabel := entry.ClusterLabel
-		if !entry.PrivateUseArea {
-			rustCode = append(rustCode, fmt.Sprintf("%-5s // '%s'", offset, clusterLabel))
-		} else {
-			// PUA block chars have description strings, so format comment without quotes
-			rustCode = append(rustCode, fmt.Sprintf("%-5s // %s", offset, clusterLabel))
-		}
+		label := labelForCluster(entry.Cluster)
+		rustCode = append(rustCode, fmt.Sprintf("%-5s // %s", offset, label))
 	}
 	return strings.Join(rustCode, "\n    ")
 }
@@ -316,8 +315,8 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFo
         | 0x80..=0xFF      // Latin 1
         | 0x100..=0x17F    // Latin Extended A
         | 0x2000..=0x206F  // General Punctuation
-        | 0x20A0..=0x20CF  // Currency Symbols{{if .PrivateUseArea}}
-        | 0xE700..=0xE70C  // Subset of Private Use Area (UI Icons){{end}}
+        | 0x20A0..=0x20CF  // Currency Symbols
+        | 0xE700..=0xE70C  // Subset of Private Use Area (UI Icons)
         | 0xFFFD => {      // Subset of Specials (replacement character)
             find_pattern(cluster)
         }
@@ -380,7 +379,7 @@ const chicago = `// This code includes encoded bitmaps of glyphs from the Chicag
 // registered trademark of Apple Inc.
 //`
 
-// Regular & Small font legal notice
+// Regular font legal notice
 const geneva = `// This code includes encoded bitmaps of glyphs from the Geneva typeface which
 // was designed by Susan Kare and released by Apple in 1984. Geneva is a
 // registered trademark of Apple Inc.
