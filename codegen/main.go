@@ -167,6 +167,7 @@ pub const DATA: [u32; {{.DataBufLen}}] = [
 			// Skip PUA block glyphs for fonts that don't include them
 			continue
 		} else if block == font.UNKNOWN {
+            fmt.Printf("0x%08X\n", cs.FirstCodepoint)
 			panic("character map includes cluster from unknown Unicode block")
 		}
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer

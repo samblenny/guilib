@@ -2,15 +2,38 @@ package font
 
 type UnicodeBlock int
 
-// Unicode blocks
+// Unicode blocks containing leading Unicode Scalar of grapheme clusters used
+// in currently supported fonts. For full list of Unicode blocks, see
+// https://www.unicode.org/Public/UCD/latest/ucd/Blocks.txt
 const (
-	BASIC_LATIN         UnicodeBlock = iota // Block:     00..7E; Subset:     20..7E
-	LATIN_1                                 // Block:     80..FF; Subset:     A0..FF
-	LATIN_EXTENDED_A                        // Block:   100..17F; Subset:   152..153
-	GENERAL_PUNCTUATION                     // Block: 2000..206F; Subset: 2018..2022
-	CURRENCY_SYMBOLS                        // Block: 20A0..20CF; Subset: 20AC..20AC
-	PRIVATE_USE_AREA                        // Block: E000..F8FF; Subset: E700..E70C
-	SPECIALS                                // Block: FFF0..FFFF; Subset: FFFD..FFFD
+	BASIC_LATIN                           UnicodeBlock = iota // 0000..007F: Latin, Emoji
+	LATIN_1_SUPPLEMENT                                        // 0080..00FF: Latin, Emoji
+	LATIN_EXTENDED_A                                          // 0100..017F: Latin
+	GENERAL_PUNCTUATION                                       // 2000..206F: Latin, Emoji
+	CURRENCY_SYMBOLS                                          // 20A0..20CF: Latin
+	LETTERLIKE_SYMBOLS                                        // 2100..214F: Emoji
+	ARROWS                                                    // 2190..21FF: Emoji
+	MISCELLANEOUS_TECHNICAL                                   // 2300..23FF: Emoji
+	ENCLOSED_ALPHANUMERICS                                    // 2460..24FF: Emoji
+	GEOMETRIC_SHAPES                                          // 25A0..25FF: Emoji
+	MISCELLANEOUS_SYMBOLS                                     // 2600..26FF: Emoji
+	DINGBATS                                                  // 2700..27BF: Emoji
+	SUPPLEMENTAL_ARROWS_B                                     // 2900..297F: Emoji
+	MISCELLANEOUS_SYMBOLS_AND_ARROWS                          // 2B00..2BFF: Emoji
+	CJK_SYMBOLS_AND_PUNCTUATION                               // 3000..303F: Emoji
+	ENCLOSED_CJK_LETTERS_AND_MONTHS                           // 3200..32FF: Emoji
+	PRIVATE_USE_AREA                                          // E000..F8FF: Latin, Emoji
+	SPECIALS                                                  // FFF0..FFFF: Latin (replacement symbol)
+	MAHJONG_TILES                                             // 1F000..1F02F: Emoji
+	PLAYING_CARDS                                             // 1F0A0..1F0FF: Emoji
+	ENCLOSED_ALPHANUMERIC_SUPPLEMENT                          // 1F100..1F1FF: Emoji (many)
+	ENCLOSED_IDEOGRAPHIC_SUPPLEMENT                           // 1F200..1F2FF: Emoji
+	MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS                     // 1F300..1F5FF: Emoji (very many)
+	EMOTICONS                                                 // 1F600..1F64F: Emoji (many)
+	TRANSPORT_AND_MAP_SYMBOLS                                 // 1F680..1F6FF: Emoji (many)
+	GEOMETRIC_SHAPES_EXTENDED                                 // 1F780..1F7FF: Emoji
+	SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS                      // 1F900..1F9FF: Emoji (very many)
+	SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A                        // 1FA70..1FAFF: Emoji (many)
 	UNKNOWN
 )
 
@@ -22,25 +45,67 @@ type CharSpec struct {
 }
 
 // Convert Unicode codepoint to its block
-func Block(c uint32) (block UnicodeBlock) {
-	if 0x00 <= c && c <= 0x7E {
-		block = BASIC_LATIN
-	} else if 0x80 <= c && c <= 0xFF {
-		block = LATIN_1
-	} else if 0x100 <= c && c <= 0x17F {
-		block = LATIN_EXTENDED_A
-	} else if 0x2000 <= c && c <= 0x206F {
-		block = GENERAL_PUNCTUATION
-	} else if 0x20A0 <= c && c <= 0x20CF {
-		block = CURRENCY_SYMBOLS
-	} else if 0xE700 <= c && c <= 0xE70C {
-		block = PRIVATE_USE_AREA
-	} else if 0xFFFD == c {
-		block = SPECIALS
-	} else {
-		block = UNKNOWN
+func Block(c uint32) UnicodeBlock {
+	switch {
+	case 0x0000 <= c && c <= 0x007F:
+		return BASIC_LATIN
+	case 0x0080 <= c && c <= 0x00FF:
+		return LATIN_1_SUPPLEMENT
+	case 0x0100 <= c && c <= 0x017F:
+		return LATIN_EXTENDED_A
+	case 0x2000 <= c && c <= 0x206F:
+		return GENERAL_PUNCTUATION
+	case 0x20A0 <= c && c <= 0x20CF:
+		return CURRENCY_SYMBOLS
+	case 0x2100 <= c && c <= 0x214F:
+		return LETTERLIKE_SYMBOLS
+	case 0x2190 <= c && c <= 0x21FF:
+		return ARROWS
+	case 0x2300 <= c && c <= 0x23FF:
+		return MISCELLANEOUS_TECHNICAL
+	case 0x2460 <= c && c <= 0x24FF:
+		return ENCLOSED_ALPHANUMERICS
+	case 0x25A0 <= c && c <= 0x25FF:
+		return GEOMETRIC_SHAPES
+	case 0x2600 <= c && c <= 0x26FF:
+		return MISCELLANEOUS_SYMBOLS
+	case 0x2700 <= c && c <= 0x27BF:
+		return DINGBATS
+	case 0x2900 <= c && c <= 0x297F:
+		return SUPPLEMENTAL_ARROWS_B
+	case 0x2B00 <= c && c <= 0x2BFF:
+		return MISCELLANEOUS_SYMBOLS_AND_ARROWS
+	case 0x3000 <= c && c <= 0x303F:
+		return CJK_SYMBOLS_AND_PUNCTUATION
+	case 0x3200 <= c && c <= 0x32FF:
+		return ENCLOSED_CJK_LETTERS_AND_MONTHS
+	case 0xE000 <= c && c <= 0xF8FF:
+		return PRIVATE_USE_AREA
+	case 0xFFF0 <= c && c <= 0xFFFF:
+		return SPECIALS
+	case 0x1F000 <= c && c <= 0x1F02F:
+		return MAHJONG_TILES
+	case 0x1F0A0 <= c && c <= 0x1F0FF:
+		return PLAYING_CARDS
+	case 0x1F100 <= c && c <= 0x1F1FF:
+		return ENCLOSED_ALPHANUMERIC_SUPPLEMENT
+	case 0x1F200 <= c && c <= 0x1F2FF:
+		return ENCLOSED_IDEOGRAPHIC_SUPPLEMENT
+	case 0x1F300 <= c && c <= 0x1F5FF:
+		return MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS
+	case 0x1F600 <= c && c <= 0x1F64F:
+		return EMOTICONS
+	case 0x1F680 <= c && c <= 0x1F6FF:
+		return TRANSPORT_AND_MAP_SYMBOLS
+	case 0x1F780 <= c && c <= 0x1F7FF:
+		return GEOMETRIC_SHAPES_EXTENDED
+	case 0x1F900 <= c && c <= 0x1F9FF:
+		return SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS
+	case 0x1FA70 <= c && c <= 0x1FAFF:
+		return SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A
+	default:
+		return UNKNOWN
 	}
-	return
 }
 
 func SysLatinMap() []CharSpec {
