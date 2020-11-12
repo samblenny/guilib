@@ -1,6 +1,6 @@
 # guilib
 
-A no_std monochrome raster graphics library
+A no_std monochrome raster graphics UI library
 
 
 ## WebAssembly Demo
@@ -41,14 +41,14 @@ Procedure to update source code for the bitmap fonts:
 1. Update typeface bitmap glyphs in `codegen/img/*.png`
 
 2. Update character maps or index files in `codegen/font/charmap.go`,
-   `codegen/img/emoji_index.txt`, etc.
+   `codegen/img/*.txt`, etc.
 
 3. Run `codgen/main.go` with `go run main.go`
 
 
 ## Credits
 
-See [CREDITS.md](CREDITS.md)
+This project builds on the work of others. See [CREDITS.md](CREDITS.md)
 
 
 ## License
