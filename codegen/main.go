@@ -86,20 +86,6 @@ func emojiData(font font.FontSpec) string {
 	return data
 }
 
-// Read the specified PNG file and convert its data into an image object
-func readPNGFile(name) image.Image {
-	pngFile, err := os.Open(fs.Sprites)
-	if err != nil {
-		panic("unable to open png file")
-	}
-	img, err := png.Decode(pngFile)
-	if err != nil {
-		panic("unable to decode png file")
-	}
-	pngFile.Close()
-	return img
-}
-
 // Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
 func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 	// Read glyphs from png file
@@ -182,6 +168,20 @@ func sysLatinData(fs font.FontSpec, hasPUA bool) string {
 		panic(err)
 	}
 	return dataStrBuf.String()
+}
+
+// Read the specified PNG file and convert its data into an image object
+func readPNGFile(name) image.Image {
+	pngFile, err := os.Open(fs.Sprites)
+	if err != nil {
+		panic("unable to open png file")
+	}
+	img, err := png.Decode(pngFile)
+	if err != nil {
+		panic("unable to decode png file")
+	}
+	pngFile.Close()
+	return img
 }
 
 // Type for the index so it can be used with .RustCodeFor* methods in templates
