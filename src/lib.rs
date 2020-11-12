@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 #![no_std]
+#![forbid(unsafe_code)]
 
 mod blit;
 mod fonts;

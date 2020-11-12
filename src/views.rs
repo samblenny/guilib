@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Sam Blenny
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //
+#![forbid(unsafe_code)]
 use super::fonts::{pua, Font};
 use super::{blit, fonts, kbd, state};
 
