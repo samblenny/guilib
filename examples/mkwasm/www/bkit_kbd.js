@@ -1,3 +1,6 @@
+// Copyright (c) 2020 Sam Blenny
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
 "use strict";
 
 // Callbacks for sending keyscan codes into a message queue

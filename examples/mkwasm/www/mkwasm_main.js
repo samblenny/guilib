@@ -1,3 +1,6 @@
+// Copyright (c) 2020 Sam Blenny
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
 "use strict";
 import * as wasm from './mkwasm_wasm.js';
 import * as kbd from './bkit_kbd.js';
