@@ -31,7 +31,7 @@ func main() {
 }
 
 // Change this to control the visibility of debug messages
-const enableDebug = false;
+const enableDebug = false
 
 // Path for output files with generated font code
 const outPath = "../src/fonts"
@@ -97,9 +97,7 @@ func sysLatinData(fs font.FontSpec) string {
 	// Loop through the CharSpec list (maps grapheme clusters onto sprite sheet grid)
 	for _, cs := range font.SysLatinMap() {
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
-		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
-		debugPixelMatrix(cs, matrix, enableDebug)
-		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
+		blitPattern := font.ConvertGlyphToBlitPattern(img, fs, cs, enableDebug)
 		dataOffset := len(dataBuf)
 		dataBuf = append(dataBuf, blitPattern...)
 		label := labelForCluster(cs.GraphemeCluster)
@@ -145,17 +143,6 @@ func readPNGFile(name string) image.Image {
 	return img
 }
 
-// Dump an ASCII art approximation of the blit pattern to stdout. This can help
-// with troubleshooting character map setup when adding a new font.
-func debugPixelMatrix(cs font.CharSpec, matrix font.Matrix, enable bool) {
-	if enable {
-		cp := cs.FirstCodepoint
-		cluster := cs.GraphemeCluster
-		fmt.Printf("%X: '%s' = %+q\n", cp, cluster, cluster)
-		fmt.Println(font.ConvertMatrixToText(matrix))
-	}
-}
-
 // Make label for grapheme cluster with special handling for UI sprites in PUA block
 func labelForCluster(c string) string {
 	switch c {
@@ -195,9 +182,9 @@ type ClusterOffsetIndex []ClusterOffsetEntry
 
 // An index entry for translating from grapheme cluster to blit pattern
 type ClusterOffsetEntry struct {
-	M3Hash         uint32
-	Cluster        string
-	DataOffset     int
+	M3Hash     uint32
+	Cluster    string
+	DataOffset int
 }
 
 // Return Murmur3 hash function of a string using each character as a u32 block

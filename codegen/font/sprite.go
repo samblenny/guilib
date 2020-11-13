@@ -28,9 +28,10 @@ type FontSpec struct {
 // Extract matrix of pixels from an image containing grid of glyphs
 // - img: image.Image from png file containing glyph grid
 // - font: Glyph sheet specs (glyph size, border/gutter, etc)
-// - row: source row in glyph grid
-// - col: source column in glyph grid
-func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (Matrix, uint32) {
+// - cs: Character specs (source row and column in glyph grid)
+func ConvertGlyphToBlitPattern(img image.Image, font FontSpec, cs CharSpec, dbg bool) BlitPattern {
+	row := cs.Row
+	col := cs.Col
 	imgRect := img.Bounds()
 	rows := (imgRect.Max.Y - font.Border) / (font.Size + font.Gutter)
 	if row < 0 || row >= rows || col < 0 || col >= font.Cols {
@@ -54,7 +55,8 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 		pxMatrix = append(pxMatrix, row)
 	}
 	pxMatrix, yOffset := trimMatrix(font, row, col, pxMatrix)
-	return pxMatrix, yOffset
+	debugMatrix(cs, pxMatrix, dbg)
+	return convertMatrixToPattern(pxMatrix, yOffset)
 }
 
 // Trim pixel matrix to remove whitespace around the glyph. Return the trimmed
@@ -80,8 +82,19 @@ func trimMatrix(font FontSpec, row int, col int, pxMatrix Matrix) (Matrix, uint3
 	return pxMatrix, uint32(yOffset)
 }
 
+// Dump an ASCII art approximation of the blit pattern to stdout. This can help
+// with troubleshooting character map setup when adding a new font.
+func debugMatrix(cs CharSpec, matrix Matrix, enable bool) {
+	if enable {
+		cp := cs.FirstCodepoint
+		cluster := cs.GraphemeCluster
+		fmt.Printf("%X: '%s' = %+q\n", cp, cluster, cluster)
+		fmt.Println(convertMatrixToText(matrix))
+	}
+}
+
 // Return glyph as text with one ASCII char per pixel
-func ConvertMatrixToText(matrix Matrix) string {
+func convertMatrixToText(matrix Matrix) string {
 	var ascii string
 	for _, row := range matrix {
 		for _, px := range row {
@@ -163,7 +176,7 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 // of the first pixel word. Patterns that need padding because their size is
 // not a multiple of 32 bits (width*height % 32 != 0) get padded with zeros in
 // the least significant bits of the last word.
-func ConvertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
+func convertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 	// Pack trimmed pattern into a byte array
 	patW := uint32(0)
 	patH := uint32(0)
