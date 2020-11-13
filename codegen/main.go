@@ -56,11 +56,11 @@ func codegen() {
 		var data string
 		switch f.Name {
 		case "Emoji":
-			data = emojiData(f)
+			data = genRustyFontData(f, []font.CharSpec{})
 		case "Bold":
-			data = sysLatinData(f)
+			data = genRustyFontData(f, font.SysLatinMap())
 		case "Regular":
-			data = sysLatinData(f)
+			data = genRustyFontData(f, font.SysLatinMap())
 		default:
 			panic("unexpected FontSpec.Name")
 		}
@@ -81,16 +81,13 @@ func codegen() {
 	}
 }
 
-// Generate rust code for emoji glyph blit pattern and grapheme cluster index data
-func emojiData(font font.FontSpec) string {
-	data := "/* TODO: Emoji data */"
-	return data
-}
-
-// Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
-func sysLatinData(fs font.FontSpec) string {
+// Generate rust code for glyph blit pattern data and related grapheme cluster index
+func genRustyFontData(fs font.FontSpec, csList []font.CharSpec) string {
+	if len(csList) == 0 {
+		return fmt.Sprintf("/* TODO: %s data */", fs.Name)
+	}
 	// Find all the glyphs and pack them into a list of blit pattern objects
-	pl := patternListFromSpriteSheet(fs, font.SysLatinMap())
+	pl := patternListFromSpriteSheet(fs, csList)
 	// Make rust code for the blit pattern DATA array, plus an index list
 	rb := rustyBlitsFromPatternList(pl)
 	// Render data template
