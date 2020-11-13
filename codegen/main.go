@@ -89,35 +89,17 @@ func emojiData(font font.FontSpec) string {
 
 // Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
 func sysLatinData(fs font.FontSpec) string {
-	patternList := patternListFromSpriteSheet(fs, font.SysLatinMap())
-	// Put the blit patterns
-	var dataBuf []uint32
-	var dataBufRust string
-	var coIndex []ClusterOffsetEntry
-	for _, pl := range patternList {
-		dataOffset := len(dataBuf)
-		dataBuf = append(dataBuf, pl.Bytes...)
-		label := labelForCluster(pl.CS.GraphemeCluster)
-		comment := fmt.Sprintf("[%d]: %X %s", dataOffset, pl.CS.FirstCodepoint, label)
-		rustCode := font.ConvertPatternToRust(pl, comment)
-		dataBufRust += rustCode
-		// Update the index with the correct offset (DATA[n]) for pattern header
-		seed := uint32(0)
-		coIndex = append(coIndex, ClusterOffsetEntry{
-			murmur3(pl.CS.GraphemeCluster, seed),
-			pl.CS.GraphemeCluster,
-			dataOffset,
-		})
-	}
-	// Sort the index
-	sort.Slice(coIndex, func(i, j int) bool { return coIndex[i].M3Hash < coIndex[j].M3Hash })
+	// Find all the glyphs and pack them into a list of blit pattern objects
+	pl := patternListFromSpriteSheet(fs, font.SysLatinMap())
+	// Make rust code for the blit pattern DATA array, plus an index list
+	rb := rustyBlitsFromPatternList(pl)
 	// Render data template
 	dataT := template.Must(template.New("dataBuf").Parse(dataTemplate))
 	dataContext := struct {
 		DataBufRust string
 		DataBufLen  int
 		COIndex     ClusterOffsetIndex
-	}{dataBufRust, len(dataBuf), coIndex}
+	}{rb.Code, rb.DataLen, rb.Index}
 	var dataStrBuf bytes.Buffer
 	err := dataT.Execute(&dataStrBuf, dataContext)
 	if err != nil {
@@ -136,6 +118,30 @@ func patternListFromSpriteSheet(fs font.FontSpec, csList []font.CharSpec) []font
 		patternList = append(patternList, blitPattern)
 	}
 	return patternList
+}
+
+// Make rust source code and an index list from a list of glyph blit patterns.
+// When this finishes, rust source code for the `DATA: [u32; n] = [...];` array
+// of concatenated blit patterns is in the return values's .Code. The length (n)
+// of the `DATA: [u32; n]...` blit pattern array is in .DataLen, and the
+// ClusterOffsetEntry{...} index entries are in .Index.
+func rustyBlitsFromPatternList(pl []font.BlitPattern) RustyBlits {
+	rb := RustyBlits{"", 0, ClusterOffsetIndex{}}
+	for _, p := range pl {
+		label := labelForCluster(p.CS.GraphemeCluster)
+		comment := fmt.Sprintf("[%d]: %X %s", rb.DataLen, p.CS.FirstCodepoint, label)
+		rb.Code += font.ConvertPatternToRust(p, comment)
+		// Update the index with the correct offset (DATA[n]) for pattern header
+		rb.Index = append(rb.Index, ClusterOffsetEntry{
+			murmur3(p.CS.GraphemeCluster, 0),
+			p.CS.GraphemeCluster,
+			rb.DataLen,
+		})
+		rb.DataLen += len(p.Bytes)
+	}
+	// Sort the index
+	sort.Slice(rb.Index, func(i, j int) bool { return rb.Index[i].M3Hash < rb.Index[j].M3Hash })
+	return rb
 }
 
 // Read the specified PNG file and convert its data into an image object
@@ -184,6 +190,13 @@ func labelForCluster(c string) string {
 	default:
 		return fmt.Sprintf("'%s'", c)
 	}
+}
+
+// Holds an index list and rust source code for a font's worth of blit patterns
+type RustyBlits struct {
+	Code    string
+	DataLen int
+	Index   ClusterOffsetIndex
 }
 
 // Type for the index so it can be used with .RustCodeFor* methods in templates
