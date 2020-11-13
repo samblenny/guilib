@@ -95,11 +95,7 @@ func sysLatinData(fs font.FontSpec) string {
 	rb := rustyBlitsFromPatternList(pl)
 	// Render data template
 	dataT := template.Must(template.New("dataBuf").Parse(dataTemplate))
-	dataContext := struct {
-		DataBufRust string
-		DataBufLen  int
-		COIndex     ClusterOffsetIndex
-	}{rb.Code, rb.DataLen, rb.Index}
+	dataContext := struct{ RB RustyBlits }{rb}
 	var dataStrBuf bytes.Buffer
 	err := dataT.Execute(&dataStrBuf, dataContext)
 	if err != nil {
@@ -340,13 +336,13 @@ fn find_pattern(cluster: &str) -> Result<usize, super::GlyphNotFound> {
 }
 
 // Index of murmur3(grapheme cluster) with sort order matching PATTERN_OFFSETS
-const HASHED_CLUSTERS: [u32; {{len .COIndex}}] = [
-    {{.COIndex.RustCodeForClusterHashes}}
+const HASHED_CLUSTERS: [u32; {{len .RB.Index}}] = [
+    {{.RB.Index.RustCodeForClusterHashes}}
 ];
 
 // Lookup table from hashed cluster to blit pattern offset (sort order matches HASHED_CLUSTERS)
-const PATTERN_OFFSETS: [usize; {{len .COIndex}}] = [
-    {{.COIndex.RustCodeForOffsets}}
+const PATTERN_OFFSETS: [usize; {{len .RB.Index}}] = [
+    {{.RB.Index.RustCodeForOffsets}}
 ];
 
 /// Packed glyph pattern data.
@@ -359,8 +355,8 @@ const PATTERN_OFFSETS: [usize; {{len .COIndex}}] = [
 ///  h: Height of pattern in pixels
 ///  yOffset: Vertical offset (pixels downward from top of line) to position
 ///     glyph pattern properly relative to text baseline
-pub const DATA: [u32; {{.DataBufLen}}] = [
-{{.DataBufRust}}];`
+pub const DATA: [u32; {{.RB.DataLen}}] = [
+{{.RB.Code}}];`
 
 // Emoji graphics legal notice
 const twemoji = `// This code includes encoded bitmaps with modified versions of graphics from
