@@ -85,7 +85,7 @@ func genRustyFontData(fs font.FontSpec, csList []font.CharSpec) string {
 	pl := patternListFromSpriteSheet(fs, csList)
 	// Make rust code for the blit pattern DATA array, plus an index list
 	rb := rustyBlitsFromPatternList(pl)
-	return renderTemplate(dataTemplate, "data", struct { RB RustyBlits }{rb})
+	return renderTemplate(dataTemplate, "data", struct{ RB RustyBlits }{rb})
 }
 
 // Extract glyph sprites from a PNG grid and pack them into a list of blit pattern objects
