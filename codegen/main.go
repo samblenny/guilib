@@ -31,7 +31,7 @@ func main() {
 }
 
 // Change this to control the visibility of debug messages
-const enableDebug = true;
+const enableDebug = false;
 
 // Path for output files with generated font code
 const outPath = "../src/fonts"
