@@ -53,6 +53,13 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 		}
 		pxMatrix = append(pxMatrix, row)
 	}
+	pxMatrix, yOffset := trimMatrix(font, row, col, pxMatrix)
+	return pxMatrix, yOffset
+}
+
+// Trim pixel matrix to remove whitespace around the glyph. Return the trimmed
+// matrix and the y-offset (pixels of top whitespace that were trimmed).
+func trimMatrix(font FontSpec, row int, col int, pxMatrix Matrix) (Matrix, uint32) {
 	// Trim left whitespace
 	trblTrimLimit := trimLimits(font, row, col)
 	pxMatrix = matrixTranspose(pxMatrix)
@@ -70,12 +77,11 @@ func ConvertGlyphBoxToMatrix(img image.Image, font FontSpec, row int, col int) (
 	pxMatrix = reverseRows(pxMatrix)
 	pxMatrix = trimLeadingEmptyRows(pxMatrix, trblTrimLimit[2])
 	pxMatrix = reverseRows(pxMatrix)
-	// Return matrix and yOffset
 	return pxMatrix, uint32(yOffset)
 }
 
 // Return glyph as text with one ASCII char per pixel
-func ConvertMatrixToText(matrix Matrix, yOffset uint32) string {
+func ConvertMatrixToText(matrix Matrix) string {
 	var ascii string
 	for _, row := range matrix {
 		for _, px := range row {

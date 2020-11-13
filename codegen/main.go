@@ -18,6 +18,21 @@ import (
 	"text/template"
 )
 
+// Command line switch to confirm intent of writing output files
+const confirm = "--replace-font-files"
+
+// Main: check for confirmation switch before writing files
+func main() {
+	if len(os.Args) == 2 && os.Args[1] == confirm {
+		codegen()
+	} else {
+		usage()
+	}
+}
+
+// Change this to control the visibility of debug messages
+const enableDebug = true;
+
 // Path for output files with generated font code
 const outPath = "../src/fonts"
 
@@ -31,18 +46,6 @@ func fonts() []font.FontSpec {
 		font.FontSpec{"Emoji", "img/emoji48x48_o3x0.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
 		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
 		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
-	}
-}
-
-// Command line switch to confirm intent of writing output files
-const confirm = "--replace-font-files"
-
-// Main: check for confirmation switch before writing files
-func main() {
-	if len(os.Args) == 2 && os.Args[1] == confirm {
-		codegen()
-	} else {
-		usage()
 	}
 }
 
@@ -91,27 +94,11 @@ func sysLatinData(fs font.FontSpec) string {
 	var dataBuf []uint32
 	var dataBufRust string
 	var coIndex []ClusterOffsetEntry
-	// Loop through the big list of []CharSpec structs that map from
-	// grapheme clusters to row and column grid coordinates in the sprite
-	// sheet of glyphs. For each grapheme cluster:
-	// 1. Read the glyph pixels
-	// 2. Pack them into the blit pattern data array
-	// 3. Add an entry to the index
+	// Loop through the CharSpec list (maps grapheme clusters onto sprite sheet grid)
 	for _, cs := range font.SysLatinMap() {
-		// Identify the Unicode block for this grapheme cluster
-		block := font.Block(cs.FirstCodepoint)
-		if block == font.UNKNOWN {
-			fmt.Printf("0x%08X\n", cs.FirstCodepoint)
-			panic("character map includes cluster from unknown Unicode block")
-		}
 		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
 		matrix, yOffset := font.ConvertGlyphBoxToMatrix(img, fs, cs.Row, cs.Col)
-		// Uncomment the two `fmt...` lines below if you want an ASCII art debug dump of
-		// the blit patterns on stdout. The debug dump can help to find and fix data
-		// entry problems in the []CharSpec character map.
-		//
-		// fmt.Printf("%X: %s\n", cs.Codepoint, cs.Chr)
-		// fmt.Println(font.ConvertMatrixToText(matrix, yOffset))
+		debugPixelMatrix(cs, matrix, enableDebug)
 		blitPattern := font.ConvertMatrixToPattern(matrix, yOffset)
 		dataOffset := len(dataBuf)
 		dataBuf = append(dataBuf, blitPattern...)
@@ -125,7 +112,6 @@ func sysLatinData(fs font.FontSpec) string {
 			murmur3(cs.GraphemeCluster, seed),
 			cs.GraphemeCluster,
 			dataOffset,
-			block == font.PRIVATE_USE_AREA,
 		})
 	}
 	// Sort the index
@@ -157,6 +143,17 @@ func readPNGFile(name string) image.Image {
 	}
 	pngFile.Close()
 	return img
+}
+
+// Dump an ASCII art approximation of the blit pattern to stdout. This can help
+// with troubleshooting character map setup when adding a new font.
+func debugPixelMatrix(cs font.CharSpec, matrix font.Matrix, enable bool) {
+	if enable {
+		cp := cs.FirstCodepoint
+		cluster := cs.GraphemeCluster
+		fmt.Printf("%X: '%s' = %+q\n", cp, cluster, cluster)
+		fmt.Println(font.ConvertMatrixToText(matrix))
+	}
 }
 
 // Make label for grapheme cluster with special handling for UI sprites in PUA block
@@ -201,7 +198,6 @@ type ClusterOffsetEntry struct {
 	M3Hash         uint32
 	Cluster        string
 	DataOffset     int
-	PrivateUseArea bool
 }
 
 // Return Murmur3 hash function of a string using each character as a u32 block
