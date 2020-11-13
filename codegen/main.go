@@ -51,7 +51,6 @@ func fonts() []font.FontSpec {
 
 // Generate rust source code files for fonts
 func codegen() {
-	t := template.Must(template.New("usage").Parse(fontFileTemplate))
 	for _, f := range fonts() {
 		var data string
 		switch f.Name {
@@ -69,15 +68,11 @@ func codegen() {
 			OutPath string
 			Data    string
 		}{f, outPath, data}
-		var buf bytes.Buffer
-		err := t.Execute(&buf, context)
-		if err != nil {
-			panic(err)
-		}
-		// Write the file
+		// Generate rust source code and write it to a file
+		code := renderTemplate(fontFileTemplate, "font", context)
 		op := path.Join(outPath, f.RustOut)
 		fmt.Println("Writing to", op)
-		ioutil.WriteFile(op, buf.Bytes(), 0644)
+		ioutil.WriteFile(op, []byte(code), 0644)
 	}
 }
 
@@ -90,15 +85,7 @@ func genRustyFontData(fs font.FontSpec, csList []font.CharSpec) string {
 	pl := patternListFromSpriteSheet(fs, csList)
 	// Make rust code for the blit pattern DATA array, plus an index list
 	rb := rustyBlitsFromPatternList(pl)
-	// Render data template
-	dataT := template.Must(template.New("dataBuf").Parse(dataTemplate))
-	dataContext := struct{ RB RustyBlits }{rb}
-	var dataStrBuf bytes.Buffer
-	err := dataT.Execute(&dataStrBuf, dataContext)
-	if err != nil {
-		panic(err)
-	}
-	return dataStrBuf.String()
+	return renderTemplate(dataTemplate, "data", struct { RB RustyBlits }{rb})
 }
 
 // Extract glyph sprites from a PNG grid and pack them into a list of blit pattern objects
@@ -250,7 +237,28 @@ func (coIndex ClusterOffsetIndex) RustCodeForOffsets() string {
 
 // Print usage message
 func usage() {
-	templateString := `
+	context := struct {
+		Confirm string
+		OutPath string
+		Fonts   []font.FontSpec
+	}{confirm, outPath, fonts()}
+	s := renderTemplate(usageTemplate, "usage", context)
+	fmt.Println(s)
+}
+
+// Return a string from rendering the given template and context data
+func renderTemplate(templateString string, templateName string, context interface{}) string {
+	t := template.Must(template.New(templateName).Parse(templateString))
+	var buf bytes.Buffer
+	err := t.Execute(&buf, context)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+// Template with usage instructions for this command line tool
+const usageTemplate = `
 This tool generates fonts in the form of rust source code.
 To confirm that you want to write the files, use the {{.Confirm}} switch.
 
@@ -260,17 +268,6 @@ Font files that will be generated:{{range $f := .Fonts}}
 Usage:
     go run main.go {{.Confirm}}
 `
-	t := template.Must(template.New("usage").Parse(templateString))
-	context := struct {
-		Confirm string
-		OutPath string
-		Fonts   []font.FontSpec
-	}{confirm, outPath, fonts()}
-	err := t.Execute(os.Stdout, context)
-	if err != nil {
-		panic(err)
-	}
-}
 
 // Template with rust source code for a outer structure of a font file
 const fontFileTemplate = `#![forbid(unsafe_code)]
