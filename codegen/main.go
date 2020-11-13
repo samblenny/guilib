@@ -89,26 +89,23 @@ func emojiData(font font.FontSpec) string {
 
 // Generate rust code for sysLatin glyph blit pattern and grapheme cluster index data
 func sysLatinData(fs font.FontSpec) string {
-	// Read glyphs from png file
-	img := readPNGFile(fs.Sprites)
+	patternList := patternListFromSpriteSheet(fs, font.SysLatinMap())
+	// Put the blit patterns
 	var dataBuf []uint32
 	var dataBufRust string
 	var coIndex []ClusterOffsetEntry
-	// Loop through the CharSpec list (maps grapheme clusters onto sprite sheet grid)
-	for _, cs := range font.SysLatinMap() {
-		// Find the glyph and pack it into a [u32] blit pattern for the data buffer
-		blitPattern := font.ConvertGlyphToBlitPattern(img, fs, cs, enableDebug)
+	for _, pl := range patternList {
 		dataOffset := len(dataBuf)
-		dataBuf = append(dataBuf, blitPattern...)
-		label := labelForCluster(cs.GraphemeCluster)
-		comment := fmt.Sprintf("[%d]: %X %s", dataOffset, cs.FirstCodepoint, label)
-		rustCode := font.ConvertPatternToRust(blitPattern, comment)
+		dataBuf = append(dataBuf, pl.Bytes...)
+		label := labelForCluster(pl.CS.GraphemeCluster)
+		comment := fmt.Sprintf("[%d]: %X %s", dataOffset, pl.CS.FirstCodepoint, label)
+		rustCode := font.ConvertPatternToRust(pl, comment)
 		dataBufRust += rustCode
 		// Update the index with the correct offset (DATA[n]) for pattern header
 		seed := uint32(0)
 		coIndex = append(coIndex, ClusterOffsetEntry{
-			murmur3(cs.GraphemeCluster, seed),
-			cs.GraphemeCluster,
+			murmur3(pl.CS.GraphemeCluster, seed),
+			pl.CS.GraphemeCluster,
 			dataOffset,
 		})
 	}
@@ -127,6 +124,18 @@ func sysLatinData(fs font.FontSpec) string {
 		panic(err)
 	}
 	return dataStrBuf.String()
+}
+
+// Extract glyph sprites from a PNG grid and pack them into a list of blit pattern objects
+func patternListFromSpriteSheet(fs font.FontSpec, csList []font.CharSpec) []font.BlitPattern {
+	// Read glyphs from png file
+	img := readPNGFile(fs.Sprites)
+	var patternList []font.BlitPattern
+	for _, cs := range csList {
+		blitPattern := font.ConvertGlyphToBlitPattern(img, fs, cs, enableDebug)
+		patternList = append(patternList, blitPattern)
+	}
+	return patternList
 }
 
 // Read the specified PNG file and convert its data into an image object

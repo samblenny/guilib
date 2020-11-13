@@ -11,7 +11,10 @@ import (
 
 type Matrix [][]int
 type MatrixRow []int
-type BlitPattern []uint32
+type BlitPattern struct {
+	Bytes []uint32
+	CS    CharSpec
+}
 
 // Holds description of sprite sheet and character map for generating a font
 type FontSpec struct {
@@ -56,7 +59,8 @@ func ConvertGlyphToBlitPattern(img image.Image, font FontSpec, cs CharSpec, dbg 
 	}
 	pxMatrix, yOffset := trimMatrix(font, row, col, pxMatrix)
 	debugMatrix(cs, pxMatrix, dbg)
-	return convertMatrixToPattern(pxMatrix, yOffset)
+	patternBytes := convertMatrixToPattern(pxMatrix, yOffset)
+	return BlitPattern{patternBytes, cs}
 }
 
 // Trim pixel matrix to remove whitespace around the glyph. Return the trimmed
@@ -176,7 +180,7 @@ func trimLimits(font FontSpec, row int, col int) [4]int {
 // of the first pixel word. Patterns that need padding because their size is
 // not a multiple of 32 bits (width*height % 32 != 0) get padded with zeros in
 // the least significant bits of the last word.
-func convertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
+func convertMatrixToPattern(pxMatrix Matrix, yOffset uint32) []uint32 {
 	// Pack trimmed pattern into a byte array
 	patW := uint32(0)
 	patH := uint32(0)
@@ -184,7 +188,7 @@ func convertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 		patW = uint32(len(pxMatrix[0]))
 		patH = uint32(len(pxMatrix))
 	}
-	pattern := BlitPattern{(patW << 16) | (patH << 8) | yOffset}
+	pattern := []uint32{(patW << 16) | (patH << 8) | yOffset}
 	bufWord := uint32(0)
 	flushed := false
 	for y := uint32(0); y < patH; y++ {
@@ -213,20 +217,20 @@ func convertMatrixToPattern(pxMatrix Matrix, yOffset uint32) BlitPattern {
 func ConvertPatternToRust(pattern BlitPattern, comment string) string {
 	patternStr := fmt.Sprintf("    // %s\n    ", comment)
 	wordsPerRow := uint32(8)
-	ceilRow := uint32(len(pattern)) / wordsPerRow
-	if uint32(len(pattern))%wordsPerRow > 0 {
+	ceilRow := uint32(len(pattern.Bytes)) / wordsPerRow
+	if uint32(len(pattern.Bytes))%wordsPerRow > 0 {
 		ceilRow += 1
 	}
 	for i := uint32(0); i < ceilRow; i++ {
 		start := i * wordsPerRow
-		end := min(uint32(len(pattern)), (i+1)*wordsPerRow)
-		line := pattern[start:end]
+		end := min(uint32(len(pattern.Bytes)), (i+1)*wordsPerRow)
+		line := pattern.Bytes[start:end]
 		var s []string
 		for _, word := range line {
 			s = append(s, fmt.Sprintf("0x%08x", word))
 		}
 		patternStr += strings.Join(s, ", ") + ","
-		if end < uint32(len(pattern)) {
+		if end < uint32(len(pattern.Bytes)) {
 			patternStr += "\n    "
 		}
 	}
