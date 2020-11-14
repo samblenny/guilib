@@ -172,23 +172,6 @@ func labelForCluster(c string) string {
 	}
 }
 
-// Holds an index list and rust source code for a font's worth of blit patterns
-type RustyBlits struct {
-	Code    string
-	DataLen int
-	Index   ClusterOffsetIndex
-}
-
-// Type for the index so it can be used with .RustCodeFor* methods in templates
-type ClusterOffsetIndex []ClusterOffsetEntry
-
-// An index entry for translating from grapheme cluster to blit pattern
-type ClusterOffsetEntry struct {
-	M3Hash     uint32
-	Cluster    string
-	DataOffset int
-}
-
 // Return Murmur3 hash function of a string using each character as a u32 block
 func murmur3(key string, seed uint32) uint32 {
 	h := seed
@@ -211,6 +194,23 @@ func murmur3(key string, seed uint32) uint32 {
 	h ^= h >> 13
 	h *= 0xc2b2ae35
 	return h ^ (h >> 16)
+}
+
+// Holds an index list and rust source code for a font's worth of blit patterns
+type RustyBlits struct {
+	Code    string
+	DataLen int
+	Index   ClusterOffsetIndex
+}
+
+// Type for the index so it can be used with .RustCodeFor* methods in templates
+type ClusterOffsetIndex []ClusterOffsetEntry
+
+// An index entry for translating from grapheme cluster to blit pattern
+type ClusterOffsetEntry struct {
+	M3Hash     uint32
+	Cluster    string
+	DataOffset int
 }
 
 // Format the inner elements of a [u32; n] cluster hash index table
@@ -247,8 +247,8 @@ func usage() {
 }
 
 // Return a string from rendering the given template and context data
-func renderTemplate(templateString string, templateName string, context interface{}) string {
-	t := template.Must(template.New(templateName).Parse(templateString))
+func renderTemplate(templateString string, name string, context interface{}) string {
+	t := template.Must(template.New(name).Parse(templateString))
 	var buf bytes.Buffer
 	err := t.Execute(&buf, context)
 	if err != nil {
