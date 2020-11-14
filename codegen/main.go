@@ -109,7 +109,7 @@ func rustyBlitsFromPatternList(pl []font.BlitPattern) RustyBlits {
 	rb := RustyBlits{"", 0, ClusterOffsetIndex{}}
 	for _, p := range pl {
 		label := labelForCluster(p.CS.GraphemeCluster)
-		comment := fmt.Sprintf("[%d]: %X %s", rb.DataLen, p.CS.FirstCodepoint, label)
+		comment := fmt.Sprintf("[%d]: %X %s", rb.DataLen, p.CS.FirstCodepoint(), label)
 		rb.Code += font.ConvertPatternToRust(p, comment)
 		// Update the index with the correct offset (DATA[n]) for pattern header
 		rb.Index = append(rb.Index, ClusterOffsetEntry{

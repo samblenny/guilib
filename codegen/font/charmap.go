@@ -3,6 +3,12 @@
 //
 package font
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type UnicodeBlock int
 
 // Unicode blocks containing leading Unicode Scalar of grapheme clusters used
@@ -41,10 +47,22 @@ const (
 )
 
 type CharSpec struct {
-	FirstCodepoint  uint32
+	HexCluster      string
 	Row             int
 	Col             int
 	GraphemeCluster string
+}
+
+func (cs CharSpec) FirstCodepoint() uint32 {
+	base := 16
+	bits := 32
+	hexCodepoints := strings.Split(cs.HexCluster, "-")
+	n, err := strconv.ParseUint(hexCodepoints[0], base, bits)
+	if len(hexCodepoints) < 1 || err != nil {
+		fmt.Println(cs)
+		panic("unexpected value for CharSpec.HexCluster")
+	}
+	return uint32(n)
 }
 
 // Convert Unicode codepoint to its block
@@ -114,236 +132,236 @@ func Block(c uint32) UnicodeBlock {
 func SysLatinMap() []CharSpec {
 	return []CharSpec{
 		// Unicode Basic Latin block
-		CharSpec{0x20, 0, 2, " "},
-		CharSpec{0x21, 1, 2, "!"},
-		CharSpec{0x22, 2, 2, "\""},
-		CharSpec{0x23, 3, 2, "#"},
-		CharSpec{0x24, 4, 2, "$"},
-		CharSpec{0x25, 5, 2, "%"},
-		CharSpec{0x26, 6, 2, "&"},
-		CharSpec{0x27, 7, 2, "\\'"},
-		CharSpec{0x28, 8, 2, "("},
-		CharSpec{0x29, 9, 2, ")"},
-		CharSpec{0x2A, 10, 2, "*"},
-		CharSpec{0x2B, 11, 2, "+"},
-		CharSpec{0x2C, 12, 2, ","},
-		CharSpec{0x2D, 13, 2, "-"},
-		CharSpec{0x2E, 14, 2, "."},
-		CharSpec{0x2F, 15, 2, "/"},
-		CharSpec{0x30, 0, 3, "0"},
-		CharSpec{0x31, 1, 3, "1"},
-		CharSpec{0x32, 2, 3, "2"},
-		CharSpec{0x33, 3, 3, "3"},
-		CharSpec{0x34, 4, 3, "4"},
-		CharSpec{0x35, 5, 3, "5"},
-		CharSpec{0x36, 6, 3, "6"},
-		CharSpec{0x37, 7, 3, "7"},
-		CharSpec{0x38, 8, 3, "8"},
-		CharSpec{0x39, 9, 3, "9"},
-		CharSpec{0x3A, 10, 3, ":"},
-		CharSpec{0x3B, 11, 3, ";"},
-		CharSpec{0x3C, 12, 3, "<"},
-		CharSpec{0x3D, 13, 3, "="},
-		CharSpec{0x3E, 14, 3, ">"},
-		CharSpec{0x3F, 15, 3, "?"},
-		CharSpec{0x40, 0, 4, "@"},
-		CharSpec{0x41, 1, 4, "A"},
-		CharSpec{0x42, 2, 4, "B"},
-		CharSpec{0x43, 3, 4, "C"},
-		CharSpec{0x44, 4, 4, "D"},
-		CharSpec{0x45, 5, 4, "E"},
-		CharSpec{0x46, 6, 4, "F"},
-		CharSpec{0x47, 7, 4, "G"},
-		CharSpec{0x48, 8, 4, "H"},
-		CharSpec{0x49, 9, 4, "I"},
-		CharSpec{0x4A, 10, 4, "J"},
-		CharSpec{0x4B, 11, 4, "K"},
-		CharSpec{0x4C, 12, 4, "L"},
-		CharSpec{0x4D, 13, 4, "M"},
-		CharSpec{0x4E, 14, 4, "N"},
-		CharSpec{0x4F, 15, 4, "O"},
-		CharSpec{0x50, 0, 5, "P"},
-		CharSpec{0x51, 1, 5, "Q"},
-		CharSpec{0x52, 2, 5, "R"},
-		CharSpec{0x53, 3, 5, "S"},
-		CharSpec{0x54, 4, 5, "T"},
-		CharSpec{0x55, 5, 5, "U"},
-		CharSpec{0x56, 6, 5, "V"},
-		CharSpec{0x57, 7, 5, "W"},
-		CharSpec{0x58, 8, 5, "X"},
-		CharSpec{0x59, 9, 5, "Y"},
-		CharSpec{0x5A, 10, 5, "Z"},
-		CharSpec{0x5B, 11, 5, "["},
-		CharSpec{0x5C, 12, 5, "\\\\"},
-		CharSpec{0x5D, 13, 5, "]"},
-		CharSpec{0x5E, 14, 5, "^"},
-		CharSpec{0x5F, 15, 5, "_"},
-		CharSpec{0x60, 0, 6, "`"},
-		CharSpec{0x61, 1, 6, "a"},
-		CharSpec{0x62, 2, 6, "b"},
-		CharSpec{0x63, 3, 6, "c"},
-		CharSpec{0x64, 4, 6, "d"},
-		CharSpec{0x65, 5, 6, "e"},
-		CharSpec{0x66, 6, 6, "f"},
-		CharSpec{0x67, 7, 6, "g"},
-		CharSpec{0x68, 8, 6, "h"},
-		CharSpec{0x69, 9, 6, "i"},
-		CharSpec{0x6A, 10, 6, "j"},
-		CharSpec{0x6B, 11, 6, "k"},
-		CharSpec{0x6C, 12, 6, "l"},
-		CharSpec{0x6D, 13, 6, "m"},
-		CharSpec{0x6E, 14, 6, "n"},
-		CharSpec{0x6F, 15, 6, "o"},
-		CharSpec{0x70, 0, 7, "p"},
-		CharSpec{0x71, 1, 7, "q"},
-		CharSpec{0x72, 2, 7, "r"},
-		CharSpec{0x73, 3, 7, "s"},
-		CharSpec{0x74, 4, 7, "t"},
-		CharSpec{0x75, 5, 7, "u"},
-		CharSpec{0x76, 6, 7, "v"},
-		CharSpec{0x77, 7, 7, "w"},
-		CharSpec{0x78, 8, 7, "x"},
-		CharSpec{0x79, 9, 7, "y"},
-		CharSpec{0x7A, 10, 7, "z"},
-		CharSpec{0x7B, 11, 7, "{"},
-		CharSpec{0x7C, 12, 7, "|"},
-		CharSpec{0x7D, 13, 7, "}"},
-		CharSpec{0x7E, 14, 7, "~"},
+		CharSpec{"20", 0, 2, " "},
+		CharSpec{"21", 1, 2, "!"},
+		CharSpec{"22", 2, 2, "\""},
+		CharSpec{"23", 3, 2, "#"},
+		CharSpec{"24", 4, 2, "$"},
+		CharSpec{"25", 5, 2, "%"},
+		CharSpec{"26", 6, 2, "&"},
+		CharSpec{"27", 7, 2, "\\'"},
+		CharSpec{"28", 8, 2, "("},
+		CharSpec{"29", 9, 2, ")"},
+		CharSpec{"2A", 10, 2, "*"},
+		CharSpec{"2B", 11, 2, "+"},
+		CharSpec{"2C", 12, 2, ","},
+		CharSpec{"2D", 13, 2, "-"},
+		CharSpec{"2E", 14, 2, "."},
+		CharSpec{"2F", 15, 2, "/"},
+		CharSpec{"30", 0, 3, "0"},
+		CharSpec{"31", 1, 3, "1"},
+		CharSpec{"32", 2, 3, "2"},
+		CharSpec{"33", 3, 3, "3"},
+		CharSpec{"34", 4, 3, "4"},
+		CharSpec{"35", 5, 3, "5"},
+		CharSpec{"36", 6, 3, "6"},
+		CharSpec{"37", 7, 3, "7"},
+		CharSpec{"38", 8, 3, "8"},
+		CharSpec{"39", 9, 3, "9"},
+		CharSpec{"3A", 10, 3, ":"},
+		CharSpec{"3B", 11, 3, ";"},
+		CharSpec{"3C", 12, 3, "<"},
+		CharSpec{"3D", 13, 3, "="},
+		CharSpec{"3E", 14, 3, ">"},
+		CharSpec{"3F", 15, 3, "?"},
+		CharSpec{"40", 0, 4, "@"},
+		CharSpec{"41", 1, 4, "A"},
+		CharSpec{"42", 2, 4, "B"},
+		CharSpec{"43", 3, 4, "C"},
+		CharSpec{"44", 4, 4, "D"},
+		CharSpec{"45", 5, 4, "E"},
+		CharSpec{"46", 6, 4, "F"},
+		CharSpec{"47", 7, 4, "G"},
+		CharSpec{"48", 8, 4, "H"},
+		CharSpec{"49", 9, 4, "I"},
+		CharSpec{"4A", 10, 4, "J"},
+		CharSpec{"4B", 11, 4, "K"},
+		CharSpec{"4C", 12, 4, "L"},
+		CharSpec{"4D", 13, 4, "M"},
+		CharSpec{"4E", 14, 4, "N"},
+		CharSpec{"4F", 15, 4, "O"},
+		CharSpec{"50", 0, 5, "P"},
+		CharSpec{"51", 1, 5, "Q"},
+		CharSpec{"52", 2, 5, "R"},
+		CharSpec{"53", 3, 5, "S"},
+		CharSpec{"54", 4, 5, "T"},
+		CharSpec{"55", 5, 5, "U"},
+		CharSpec{"56", 6, 5, "V"},
+		CharSpec{"57", 7, 5, "W"},
+		CharSpec{"58", 8, 5, "X"},
+		CharSpec{"59", 9, 5, "Y"},
+		CharSpec{"5A", 10, 5, "Z"},
+		CharSpec{"5B", 11, 5, "["},
+		CharSpec{"5C", 12, 5, "\\\\"},
+		CharSpec{"5D", 13, 5, "]"},
+		CharSpec{"5E", 14, 5, "^"},
+		CharSpec{"5F", 15, 5, "_"},
+		CharSpec{"60", 0, 6, "`"},
+		CharSpec{"61", 1, 6, "a"},
+		CharSpec{"62", 2, 6, "b"},
+		CharSpec{"63", 3, 6, "c"},
+		CharSpec{"64", 4, 6, "d"},
+		CharSpec{"65", 5, 6, "e"},
+		CharSpec{"66", 6, 6, "f"},
+		CharSpec{"67", 7, 6, "g"},
+		CharSpec{"68", 8, 6, "h"},
+		CharSpec{"69", 9, 6, "i"},
+		CharSpec{"6A", 10, 6, "j"},
+		CharSpec{"6B", 11, 6, "k"},
+		CharSpec{"6C", 12, 6, "l"},
+		CharSpec{"6D", 13, 6, "m"},
+		CharSpec{"6E", 14, 6, "n"},
+		CharSpec{"6F", 15, 6, "o"},
+		CharSpec{"70", 0, 7, "p"},
+		CharSpec{"71", 1, 7, "q"},
+		CharSpec{"72", 2, 7, "r"},
+		CharSpec{"73", 3, 7, "s"},
+		CharSpec{"74", 4, 7, "t"},
+		CharSpec{"75", 5, 7, "u"},
+		CharSpec{"76", 6, 7, "v"},
+		CharSpec{"77", 7, 7, "w"},
+		CharSpec{"78", 8, 7, "x"},
+		CharSpec{"79", 9, 7, "y"},
+		CharSpec{"7A", 10, 7, "z"},
+		CharSpec{"7B", 11, 7, "{"},
+		CharSpec{"7C", 12, 7, "|"},
+		CharSpec{"7D", 13, 7, "}"},
+		CharSpec{"7E", 14, 7, "~"},
 
 		// Unicode Latin 1 block
-		CharSpec{0xA0, 0, 2, "\u00A0"}, // No-Break Space
-		CharSpec{0xA1, 1, 12, "¡"},
-		CharSpec{0xA2, 2, 10, "¢"},
-		CharSpec{0xA3, 3, 10, "£"},
-		CharSpec{0xA4, 15, 1, "¤"},
-		CharSpec{0xA5, 4, 11, "¥"},
-		CharSpec{0xA6, 15, 7, "¦"},
-		CharSpec{0xA7, 4, 10, "§"},
-		CharSpec{0xA8, 12, 10, "¨"},
-		CharSpec{0xA9, 9, 10, "©"},
-		CharSpec{0xAA, 11, 11, "ª"},
-		CharSpec{0xAB, 7, 12, "«"},
-		CharSpec{0xAC, 2, 12, "¬"},
-		CharSpec{0xAD, 13, 2, "\u00AD"}, // Soft Hyphen
-		CharSpec{0xAE, 8, 10, "®"},
-		CharSpec{0xAF, 8, 15, "¯"}, // Macron
-		CharSpec{0xB0, 1, 10, "°"}, // Degree Sign
-		CharSpec{0xB1, 1, 11, "±"},
-		CharSpec{0xB2, 3, 1, "²"},
-		CharSpec{0xB3, 4, 1, "³"},
-		CharSpec{0xB4, 11, 10, "´"},
-		CharSpec{0xB5, 5, 11, "µ"},
-		CharSpec{0xB6, 6, 10, "¶"},
-		CharSpec{0xB7, 1, 14, "·"},
-		CharSpec{0xB8, 12, 15, "¸"}, // Cedillia
-		CharSpec{0xB9, 2, 1, "¹"},
-		CharSpec{0xBA, 12, 11, "º"},
-		CharSpec{0xBB, 8, 12, "»"},
-		CharSpec{0xBC, 5, 1, "¼"},
-		CharSpec{0xBD, 6, 1, "½"},
-		CharSpec{0xBE, 7, 1, "¾"},
-		CharSpec{0xBF, 0, 12, "¿"},
-		CharSpec{0xC0, 11, 12, "À"},
-		CharSpec{0xC1, 7, 14, "Á"},
-		CharSpec{0xC2, 5, 14, "Â"},
-		CharSpec{0xC3, 12, 12, "Ã"},
-		CharSpec{0xC4, 0, 8, "Ä"},
-		CharSpec{0xC5, 1, 8, "Å"},
-		CharSpec{0xC6, 14, 10, "Æ"},
-		CharSpec{0xC7, 2, 8, "Ç"},
-		CharSpec{0xC8, 9, 14, "È"},
-		CharSpec{0xC9, 3, 8, "É"},
-		CharSpec{0xCA, 6, 14, "Ê"},
-		CharSpec{0xCB, 8, 14, "Ë"},
-		CharSpec{0xCC, 13, 14, "Ì"},
-		CharSpec{0xCD, 10, 14, "Í"},
-		CharSpec{0xCE, 11, 14, "Î"},
-		CharSpec{0xCF, 12, 14, "Ï"},
-		CharSpec{0xD0, 8, 1, "Ð"},
-		CharSpec{0xD1, 4, 8, "Ñ"},
-		CharSpec{0xD2, 1, 15, "Ò"},
-		CharSpec{0xD3, 14, 14, "Ó"},
-		CharSpec{0xD4, 15, 14, "Ô"},
-		CharSpec{0xD5, 13, 12, "Õ"},
-		CharSpec{0xD6, 5, 8, "Ö"},
-		CharSpec{0xD7, 9, 1, "×"}, // Multiplication Sign
-		CharSpec{0xD8, 15, 10, "Ø"},
-		CharSpec{0xD9, 4, 15, "Ù"},
-		CharSpec{0xDA, 2, 15, "Ú"},
-		CharSpec{0xDB, 3, 15, "Û"},
-		CharSpec{0xDC, 6, 8, "Ü"},
-		CharSpec{0xDD, 10, 1, "Ý"},
-		CharSpec{0xDE, 11, 1, "Þ"},
-		CharSpec{0xDF, 7, 10, "ß"},
-		CharSpec{0xE0, 8, 8, "à"},
-		CharSpec{0xE1, 7, 8, "á"},
-		CharSpec{0xE2, 9, 8, "â"},
-		CharSpec{0xE3, 11, 8, "ã"},
-		CharSpec{0xE4, 10, 8, "ä"},
-		CharSpec{0xE5, 12, 8, "å"},
-		CharSpec{0xE6, 14, 11, "æ"},
-		CharSpec{0xE7, 13, 8, "ç"},
-		CharSpec{0xE8, 15, 8, "è"},
-		CharSpec{0xE9, 14, 8, "é"},
-		CharSpec{0xEA, 0, 9, "ê"},
-		CharSpec{0xEB, 1, 9, "ë"},
-		CharSpec{0xEC, 3, 9, "ì"},
-		CharSpec{0xED, 2, 9, "í"},
-		CharSpec{0xEE, 4, 9, "î"},
-		CharSpec{0xEF, 5, 9, "ï"},
-		CharSpec{0xF0, 12, 1, "ð"},
-		CharSpec{0xF1, 6, 9, "ñ"},
-		CharSpec{0xF2, 8, 9, "ò"},
-		CharSpec{0xF3, 7, 9, "ó"},
-		CharSpec{0xF4, 9, 9, "ô"},
-		CharSpec{0xF5, 11, 9, "õ"},
-		CharSpec{0xF6, 10, 9, "ö"},
-		CharSpec{0xF7, 6, 13, "÷"},
-		CharSpec{0xF8, 15, 11, "ø"},
-		CharSpec{0xF9, 13, 9, "ù"},
-		CharSpec{0xFA, 12, 9, "ú"},
-		CharSpec{0xFB, 14, 9, "û"},
-		CharSpec{0xFC, 15, 9, "ü"},
-		CharSpec{0xFD, 13, 1, "ý"},
-		CharSpec{0xFE, 14, 1, "þ"},
-		CharSpec{0xFF, 8, 13, "ÿ"},
+		CharSpec{"A0", 0, 2, "\u00A0"}, // No-Break Space
+		CharSpec{"A1", 1, 12, "¡"},
+		CharSpec{"A2", 2, 10, "¢"},
+		CharSpec{"A3", 3, 10, "£"},
+		CharSpec{"A4", 15, 1, "¤"},
+		CharSpec{"A5", 4, 11, "¥"},
+		CharSpec{"A6", 15, 7, "¦"},
+		CharSpec{"A7", 4, 10, "§"},
+		CharSpec{"A8", 12, 10, "¨"},
+		CharSpec{"A9", 9, 10, "©"},
+		CharSpec{"AA", 11, 11, "ª"},
+		CharSpec{"AB", 7, 12, "«"},
+		CharSpec{"AC", 2, 12, "¬"},
+		CharSpec{"AD", 13, 2, "\u00AD"}, // Soft Hyphen
+		CharSpec{"AE", 8, 10, "®"},
+		CharSpec{"AF", 8, 15, "¯"}, // Macron
+		CharSpec{"B0", 1, 10, "°"}, // Degree Sign
+		CharSpec{"B1", 1, 11, "±"},
+		CharSpec{"B2", 3, 1, "²"},
+		CharSpec{"B3", 4, 1, "³"},
+		CharSpec{"B4", 11, 10, "´"},
+		CharSpec{"B5", 5, 11, "µ"},
+		CharSpec{"B6", 6, 10, "¶"},
+		CharSpec{"B7", 1, 14, "·"},
+		CharSpec{"B8", 12, 15, "¸"}, // Cedillia
+		CharSpec{"B9", 2, 1, "¹"},
+		CharSpec{"BA", 12, 11, "º"},
+		CharSpec{"BB", 8, 12, "»"},
+		CharSpec{"BC", 5, 1, "¼"},
+		CharSpec{"BD", 6, 1, "½"},
+		CharSpec{"BE", 7, 1, "¾"},
+		CharSpec{"BF", 0, 12, "¿"},
+		CharSpec{"C0", 11, 12, "À"},
+		CharSpec{"C1", 7, 14, "Á"},
+		CharSpec{"C2", 5, 14, "Â"},
+		CharSpec{"C3", 12, 12, "Ã"},
+		CharSpec{"C4", 0, 8, "Ä"},
+		CharSpec{"C5", 1, 8, "Å"},
+		CharSpec{"C6", 14, 10, "Æ"},
+		CharSpec{"C7", 2, 8, "Ç"},
+		CharSpec{"C8", 9, 14, "È"},
+		CharSpec{"C9", 3, 8, "É"},
+		CharSpec{"CA", 6, 14, "Ê"},
+		CharSpec{"CB", 8, 14, "Ë"},
+		CharSpec{"CC", 13, 14, "Ì"},
+		CharSpec{"CD", 10, 14, "Í"},
+		CharSpec{"CE", 11, 14, "Î"},
+		CharSpec{"CF", 12, 14, "Ï"},
+		CharSpec{"D0", 8, 1, "Ð"},
+		CharSpec{"D1", 4, 8, "Ñ"},
+		CharSpec{"D2", 1, 15, "Ò"},
+		CharSpec{"D3", 14, 14, "Ó"},
+		CharSpec{"D4", 15, 14, "Ô"},
+		CharSpec{"D5", 13, 12, "Õ"},
+		CharSpec{"D6", 5, 8, "Ö"},
+		CharSpec{"D7", 9, 1, "×"}, // Multiplication Sign
+		CharSpec{"D8", 15, 10, "Ø"},
+		CharSpec{"D9", 4, 15, "Ù"},
+		CharSpec{"DA", 2, 15, "Ú"},
+		CharSpec{"DB", 3, 15, "Û"},
+		CharSpec{"DC", 6, 8, "Ü"},
+		CharSpec{"DD", 10, 1, "Ý"},
+		CharSpec{"DE", 11, 1, "Þ"},
+		CharSpec{"DF", 7, 10, "ß"},
+		CharSpec{"E0", 8, 8, "à"},
+		CharSpec{"E1", 7, 8, "á"},
+		CharSpec{"E2", 9, 8, "â"},
+		CharSpec{"E3", 11, 8, "ã"},
+		CharSpec{"E4", 10, 8, "ä"},
+		CharSpec{"E5", 12, 8, "å"},
+		CharSpec{"E6", 14, 11, "æ"},
+		CharSpec{"E7", 13, 8, "ç"},
+		CharSpec{"E8", 15, 8, "è"},
+		CharSpec{"E9", 14, 8, "é"},
+		CharSpec{"EA", 0, 9, "ê"},
+		CharSpec{"EB", 1, 9, "ë"},
+		CharSpec{"EC", 3, 9, "ì"},
+		CharSpec{"ED", 2, 9, "í"},
+		CharSpec{"EE", 4, 9, "î"},
+		CharSpec{"EF", 5, 9, "ï"},
+		CharSpec{"F0", 12, 1, "ð"},
+		CharSpec{"F1", 6, 9, "ñ"},
+		CharSpec{"F2", 8, 9, "ò"},
+		CharSpec{"F3", 7, 9, "ó"},
+		CharSpec{"F4", 9, 9, "ô"},
+		CharSpec{"F5", 11, 9, "õ"},
+		CharSpec{"F6", 10, 9, "ö"},
+		CharSpec{"F7", 6, 13, "÷"},
+		CharSpec{"F8", 15, 11, "ø"},
+		CharSpec{"F9", 13, 9, "ù"},
+		CharSpec{"FA", 12, 9, "ú"},
+		CharSpec{"FB", 14, 9, "û"},
+		CharSpec{"FC", 15, 9, "ü"},
+		CharSpec{"FD", 13, 1, "ý"},
+		CharSpec{"FE", 14, 1, "þ"},
+		CharSpec{"FF", 8, 13, "ÿ"},
 
 		// Unicode Latin Extended A block
-		CharSpec{0x152, 14, 12, "Œ"},
-		CharSpec{0x153, 15, 12, "œ"},
+		CharSpec{"152", 14, 12, "Œ"},
+		CharSpec{"153", 15, 12, "œ"},
 
 		// Unicode General Punctuation block
-		CharSpec{0x2018, 4, 13, "‘"}, // Left Single Quotation Mark
-		CharSpec{0x2019, 5, 13, "’"}, // Right Single Quotation Mark
-		CharSpec{0x201A, 2, 14, "‚"}, // Single Low-9 Quotation Mark
-		CharSpec{0x201B, 7, 11, "‛"}, // Single High-Reversed-9 Quotation Mark
-		CharSpec{0x201C, 2, 13, "“"}, // Left Double Quotation Mark
-		CharSpec{0x201D, 3, 13, "”"}, // Right Double Quotation Mark
-		CharSpec{0x201E, 3, 14, "„"}, // Double Low-9 Quotation Mark
-		CharSpec{0x201F, 8, 11, "‟"}, // Double High-Reversed-9 Quotation Mark
-		CharSpec{0x2020, 0, 10, "†"}, // Dagger
-		CharSpec{0x2021, 0, 14, "‡"}, // Double Dagger
-		CharSpec{0x2022, 5, 10, "•"}, // Bullet
+		CharSpec{"2018", 4, 13, "‘"}, // Left Single Quotation Mark
+		CharSpec{"2019", 5, 13, "’"}, // Right Single Quotation Mark
+		CharSpec{"201A", 2, 14, "‚"}, // Single Low-9 Quotation Mark
+		CharSpec{"201B", 7, 11, "‛"}, // Single High-Reversed-9 Quotation Mark
+		CharSpec{"201C", 2, 13, "“"}, // Left Double Quotation Mark
+		CharSpec{"201D", 3, 13, "”"}, // Right Double Quotation Mark
+		CharSpec{"201E", 3, 14, "„"}, // Double Low-9 Quotation Mark
+		CharSpec{"201F", 8, 11, "‟"}, // Double High-Reversed-9 Quotation Mark
+		CharSpec{"2020", 0, 10, "†"}, // Dagger
+		CharSpec{"2021", 0, 14, "‡"}, // Double Dagger
+		CharSpec{"2022", 5, 10, "•"}, // Bullet
 
 		// Unicode Currency Symbols block
-		CharSpec{0x20AC, 11, 13, "€"},
+		CharSpec{"20AC", 11, 13, "€"},
 
 		// Unicode Private Use Area assignments for UI sprites
-		CharSpec{0xE700, 0, 0, "\uE700"},  // Battery_05
-		CharSpec{0xE701, 1, 0, "\uE701"},  // Battery_25
-		CharSpec{0xE702, 2, 0, "\uE702"},  // Battery_50
-		CharSpec{0xE703, 3, 0, "\uE703"},  // Battery_75
-		CharSpec{0xE704, 4, 0, "\uE704"},  // Battery_99
-		CharSpec{0xE705, 5, 0, "\uE705"},  // Radio_3
-		CharSpec{0xE706, 6, 0, "\uE706"},  // Radio_2
-		CharSpec{0xE707, 7, 0, "\uE707"},  // Radio_1
-		CharSpec{0xE708, 8, 0, "\uE708"},  // Radio_0
-		CharSpec{0xE709, 9, 0, "\uE709"},  // Radio_Off
-		CharSpec{0xE70A, 13, 0, "\uE70A"}, // Shift_Arrow
-		CharSpec{0xE70B, 14, 0, "\uE70B"}, // Backspace_Symbol
-		CharSpec{0xE70C, 15, 0, "\uE70C"}, // Enter_Symbol
+		CharSpec{"E700", 0, 0, "\uE700"},  // Battery_05
+		CharSpec{"E701", 1, 0, "\uE701"},  // Battery_25
+		CharSpec{"E702", 2, 0, "\uE702"},  // Battery_50
+		CharSpec{"E703", 3, 0, "\uE703"},  // Battery_75
+		CharSpec{"E704", 4, 0, "\uE704"},  // Battery_99
+		CharSpec{"E705", 5, 0, "\uE705"},  // Radio_3
+		CharSpec{"E706", 6, 0, "\uE706"},  // Radio_2
+		CharSpec{"E707", 7, 0, "\uE707"},  // Radio_1
+		CharSpec{"E708", 8, 0, "\uE708"},  // Radio_0
+		CharSpec{"E709", 9, 0, "\uE709"},  // Radio_Off
+		CharSpec{"E70A", 13, 0, "\uE70A"}, // Shift_Arrow
+		CharSpec{"E70B", 14, 0, "\uE70B"}, // Backspace_Symbol
+		CharSpec{"E70C", 15, 0, "\uE70C"}, // Enter_Symbol
 
 		// Unicode Specials Block
-		CharSpec{0xFFFD, 0, 15, "�"},
+		CharSpec{"FFFD", 0, 15, "�"},
 	}
 }
