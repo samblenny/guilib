@@ -91,7 +91,7 @@ func trimMatrix(font FontSpec, row int, col int, pxMatrix Matrix) (Matrix, uint3
 func debugMatrix(cs CharSpec, matrix Matrix, enable bool) {
 	if enable {
 		cp := cs.FirstCodepoint
-		cluster := cs.GraphemeCluster
+		cluster := cs.GraphemeCluster()
 		fmt.Printf("%X: '%s' = %+q\n", cp, cluster, cluster)
 		fmt.Println(convertMatrixToText(matrix))
 	}

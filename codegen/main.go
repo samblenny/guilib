@@ -106,21 +106,25 @@ func patternListFromSpriteSheet(fs font.FontSpec, csList []font.CharSpec) []font
 // of the `DATA: [u32; n]...` blit pattern array is in .DataLen, and the
 // ClusterOffsetEntry{...} index entries are in .Index.
 func rustyBlitsFromPatternList(pl []font.BlitPattern) RustyBlits {
-	rb := RustyBlits{"", 0, ClusterOffsetIndex{}}
+	rb := RustyBlits{"", 0, FontIndex{}}
 	for _, p := range pl {
-		label := labelForCluster(p.CS.GraphemeCluster)
-		comment := fmt.Sprintf("[%d]: %X %s", rb.DataLen, p.CS.FirstCodepoint(), label)
+		label := labelForCluster(p.CS.GraphemeCluster())
+		comment := fmt.Sprintf("[%d]: %s %s", rb.DataLen, p.CS.HexCluster, label)
 		rb.Code += font.ConvertPatternToRust(p, comment)
-		// Update the index with the correct offset (DATA[n]) for pattern header
-		rb.Index = append(rb.Index, ClusterOffsetEntry{
-			murmur3(p.CS.GraphemeCluster, 0),
-			p.CS.GraphemeCluster,
+		// Update the block index with the correct offset (DATA[n]) for pattern header
+		indexEntry := ClusterOffsetEntry{
+			murmur3(p.CS.GraphemeCluster(), 0),
+			p.CS.GraphemeCluster(),
 			rb.DataLen,
-		})
+		}
+		block := font.Block(p.CS.FirstCodepoint())
+		rb.Index[block] = append(rb.Index[block], indexEntry)
 		rb.DataLen += len(p.Bytes)
 	}
-	// Sort the index
-	sort.Slice(rb.Index, func(i, j int) bool { return rb.Index[i].M3Hash < rb.Index[j].M3Hash })
+	// Sort the index for each block
+	for _, v := range rb.Index {
+		sort.Slice(v, func(i, j int) bool { return v[i].M3Hash < v[j].M3Hash })
+	}
 	return rb
 }
 
@@ -142,33 +146,37 @@ func readPNGFile(name string) image.Image {
 func labelForCluster(c string) string {
 	switch c {
 	case "\uE700":
-		return "Battery_05"
+		return "\"\\uE700\" Battery_05"
 	case "\uE701":
-		return "Battery_25"
+		return "\"\\uE701\" Battery_25"
 	case "\uE702":
-		return "Battery_50"
+		return "\"\\uE702\" Battery_50"
 	case "\uE703":
-		return "Battery_75"
+		return "\"\\uE703\" Battery_75"
 	case "\uE704":
-		return "Battery_99"
+		return "\"\\uE704\" Battery_99"
 	case "\uE705":
-		return "Radio_3"
+		return "\"\\uE705\" Radio_3"
 	case "\uE706":
-		return "Radio_2"
+		return "\"\\uE706\" Radio_2"
 	case "\uE707":
-		return "Radio_1"
+		return "\"\\uE707\" Radio_1"
 	case "\uE708":
-		return "Radio_0"
+		return "\"\\uE708\" Radio_0"
 	case "\uE709":
-		return "Radio_Off"
+		return "\"\\uE709\" Radio_Off"
 	case "\uE70A":
-		return "Shift_Arrow"
+		return "\"\\uE70A\" Shift_Arrow"
 	case "\uE70B":
-		return "Backspace_Symbol"
+		return "\"\\uE70B\" Backspace_Symbol"
 	case "\uE70C":
-		return "Enter_Symbol"
+		return "\"\\uE70C\" Enter_Symbol"
+	case "\u00AD":
+		return "\"\\u00AD\" Soft Hyphen"
+	case "\u00a0":
+		return "\"\\u00A0\" No-Break Space"
 	default:
-		return fmt.Sprintf("'%s'", c)
+		return fmt.Sprintf("%q", c)
 	}
 }
 
@@ -200,11 +208,14 @@ func murmur3(key string, seed uint32) uint32 {
 type RustyBlits struct {
 	Code    string
 	DataLen int
-	Index   ClusterOffsetIndex
+	Index   FontIndex
 }
 
-// Type for the index so it can be used with .RustCodeFor* methods in templates
-type ClusterOffsetIndex []ClusterOffsetEntry
+// Index for all the Unicode blocks in a font
+type FontIndex map[font.UBlock]BlockIndex
+
+// Index for grapheme clusters in the same Unicode block
+type BlockIndex []ClusterOffsetEntry
 
 // An index entry for translating from grapheme cluster to blit pattern
 type ClusterOffsetEntry struct {
@@ -213,19 +224,28 @@ type ClusterOffsetEntry struct {
 	DataOffset int
 }
 
-// Format the inner elements of a [u32; n] cluster hash index table
-func (coIndex ClusterOffsetIndex) RustCodeForClusterHashes() string {
+func (rb RustyBlits) IndexKeys() []font.UBlock {
+	blocks := []font.UBlock{}
+	for k, _ := range rb.Index {
+		blocks = append(blocks, k)
+	}
+	sort.Slice(blocks, func(i, j int) bool { return blocks[i].Low < blocks[j].Low })
+	return blocks
+}
+
+// Format the inner elements of a [u32; n] cluster hash index table for one block
+func (coIndex BlockIndex) RustCodeForClusterHashes() string {
 	var rustCode []string
 	for _, entry := range coIndex {
 		hash := fmt.Sprintf("0x%08X", entry.M3Hash)
 		label := labelForCluster(entry.Cluster)
-		rustCode = append(rustCode, fmt.Sprintf("%s, // %s", hash, label))
+		rustCode = append(rustCode, fmt.Sprintf("%s,  // %s", hash, label))
 	}
 	return strings.Join(rustCode, "\n    ")
 }
 
-// Format the inner elements of a [u32; n] blit pattern offset table
-func (coIndex ClusterOffsetIndex) RustCodeForOffsets() string {
+// Format the inner elements of a [u32; n] blit pattern offset table for one block
+func (coIndex BlockIndex) RustCodeForOffsets() string {
 	var rustCode []string
 	for _, entry := range coIndex {
 		offset := fmt.Sprintf("%d,", entry.DataOffset)
@@ -270,20 +290,20 @@ Usage:
 `
 
 // Template with rust source code for a outer structure of a font file
-const fontFileTemplate = `#![forbid(unsafe_code)]
-#![allow(dead_code)]
-//! {{.Font.Name}} Font
-// DO NOT MAKE EDITS HERE because this file is automatically generated.
+const fontFileTemplate = `// DO NOT MAKE EDITS HERE because this file is automatically generated.
 // To make changes, see guilib/codegen/main.go
 //
 // Copyright (c) 2020 Sam Blenny
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // NOTE: The copyright notice above applies to the rust source code in this
-// file, but not to the bitmap graphics encoded in the DATA array.
+// file, but not to the bitmap graphics encoded in the DATA array (see credits).
 //
 // CREDITS:
 {{.Font.Legal}}
+//! {{.Font.Name}} Font
+#![forbid(unsafe_code)]
+#![allow(dead_code)]
 
 /// Maximum height of glyph patterns in this bitmap typeface.
 /// This will be true: h + y_offset <= MAX_HEIGHT
@@ -306,38 +326,41 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFo
         None => return Err(super::GlyphNotFound),
     }
     return match first_char {
-        0x00..=0x7E        // Basic Latin
-        | 0x80..=0xFF      // Latin 1
-        | 0x100..=0x17F    // Latin Extended A
-        | 0x2000..=0x206F  // General Punctuation
-        | 0x20A0..=0x20CF  // Currency Symbols
-        | 0xE700..=0xE70C  // Subset of Private Use Area (UI Icons)
-        | 0xFFFD => {      // Subset of Specials (replacement character)
-            find_pattern(cluster)
+        {{ range $_, $k := .RB.IndexKeys -}}
+        {{- with $dex := index $.RB.Index $k -}}
+        0x{{printf "%X" $k.Low}}..=0x{{printf "%X" $k.High}} => {
+            find_pattern(cluster, &HASH_{{$k.Name}}, &OFFSET_{{$k.Name}})
         }
+        {{ end -}}
+        {{- end -}}
         _ => Err(super::GlyphNotFound),
     };
 }
 
 /// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster
-fn find_pattern(cluster: &str) -> Result<usize, super::GlyphNotFound> {
+fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize]) -> Result<usize, super::GlyphNotFound> {
     let seed = 0;
     let key = super::murmur3(cluster, seed);
-    match HASHED_CLUSTERS.binary_search(&key) {
-        Ok(index) => return Ok(PATTERN_OFFSETS[index]),
+    match hash.binary_search(&key) {
+        Ok(index) => return Ok(offset[index]),
         _ => Err(super::GlyphNotFound),
     }
 }
 
-// Index of murmur3(grapheme cluster) with sort order matching PATTERN_OFFSETS
-const HASHED_CLUSTERS: [u32; {{len .RB.Index}}] = [
-    {{.RB.Index.RustCodeForClusterHashes}}
+{{ range $_, $k := .RB.IndexKeys -}}
+{{- with $dex := index $.RB.Index $k -}}
+/// Index of murmur3(grapheme cluster); sort matches OFFSET_{{$k.Name}}
+const HASH_{{$k.Name}}: [u32; {{len $dex}}] = [
+    {{$dex.RustCodeForClusterHashes}}
 ];
 
-// Lookup table from hashed cluster to blit pattern offset (sort order matches HASHED_CLUSTERS)
-const PATTERN_OFFSETS: [usize; {{len .RB.Index}}] = [
-    {{.RB.Index.RustCodeForOffsets}}
+/// Lookup table of blit pattern offsets; sort matches HASH_{{$k.Name}}
+const OFFSET_{{$k.Name}}: [usize; {{len $dex}}] = [
+    {{$dex.RustCodeForOffsets}}
 ];
+
+{{ end -}}
+{{- end -}}
 
 /// Packed glyph pattern data.
 /// Record format:
