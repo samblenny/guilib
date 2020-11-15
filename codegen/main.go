@@ -38,12 +38,12 @@ const outPath = "../src/fonts"
 
 // Index and alias files for grapheme clusters that go with img/emoji48x48_o3x3.png
 const emojiIndexPath = "img/emoji_13_0_index.txt"
-const emojiAliasPath = "img/emoji_13_0_variation_sequence_aliases.txt"
+const emojiAliasPath = "img/emoji_13_0_aliases.txt"
 
 // Spec for how to generate font source code files from glyph grid sprite sheets
 func fonts() []font.FontSpec {
 	return []font.FontSpec{
-		font.FontSpec{"Emoji", "img/emoji48x48_o3x0.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
+		font.FontSpec{"Emoji", "img/emoji_13_0_48x48_o3x3.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
 		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
 		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
 	}
