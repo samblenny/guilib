@@ -130,7 +130,7 @@ fn keyboard_key_caps(fb: &mut state::FrameBuf, ctx: &mut state::Context, yr: bli
             if let kbd::R::C(c) = lut[i] {
                 let mut buf = [0; 4];
                 let cluster = c.encode_utf8(&mut buf);
-                if let Ok(w) = blit::glyph_width(cluster, f) {
+                if let Ok((w, _)) = blit::glyph_width(cluster, f) {
                     cr.x0 = key_cr.x0 + ((key_cr.x1 - key_cr.x0) >> 1) - (w >> 1);
                     let _ = blit::xor_char(&mut fb.buf, cr, cluster, f);
                 }

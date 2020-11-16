@@ -68,7 +68,7 @@ pub struct Font {
     pub glyph_pattern_offset: GlyphPatternOffsetFnPtr,
     pub glyph_data: GlyphDataFnPtr,
 }
-pub type GlyphPatternOffsetFnPtr = fn(&str) -> Result<usize, GlyphNotFound>;
+pub type GlyphPatternOffsetFnPtr = fn(&str) -> Result<(usize, usize), GlyphNotFound>;
 pub type GlyphDataFnPtr = fn(usize) -> u32;
 impl Font {
     pub fn new(gs: GlyphSet) -> Font {
@@ -95,13 +95,20 @@ pub fn regular_data(index: usize) -> u32 {
     regular::DATA[index]
 }
 
-/// Return Murmur3 hash function of a string using each char as a u32 block.
-/// Fonts use this to hash grapheme clusters from &str into u32.
-pub fn murmur3(key: &str, seed: u32) -> u32 {
+/// Compute Murmur3 hash function of the first limit codepoints of a string,
+/// using each char as a u32 block.
+/// Returns: (murmur3 hash, how many bytes of key were hashed (e.g. key[..n]))
+pub fn murmur3(key: &str, seed: u32, limit: u32) -> (u32, usize) {
     let mut h = seed;
     let mut k;
     // Hash each character as its own u32 block
-    for c in key.chars() {
+    let mut n = 0;
+    let mut bytes_hashed = key.len();
+    for (i, c) in key.char_indices() {
+        if n >= limit {
+            bytes_hashed = i;
+            break;
+        }
         k = c as u32;
         k = k.wrapping_mul(0xcc9e2d51);
         k = k.rotate_left(15);
@@ -110,12 +117,14 @@ pub fn murmur3(key: &str, seed: u32) -> u32 {
         h = h.rotate_left(13);
         h = h.wrapping_mul(5);
         h = h.wrapping_add(0xe6546b64);
+        n += 1;
     }
-    h ^= key.bytes().count() as u32;
+    h ^= bytes_hashed as u32;
     // Finalize with avalanche
     h ^= h >> 16;
     h = h.wrapping_mul(0x85ebca6b);
     h ^= h >> 13;
     h = h.wrapping_mul(0xc2b2ae35);
-    h ^ (h >> 16)
+    h ^= h >> 16;
+    (h, bytes_hashed)
 }

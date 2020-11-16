@@ -242,8 +242,12 @@ func (rb RustyBlits) AddAliasesToIndex(aliasList []font.GCAlias) {
 		firstCodepoint := uint32([]rune(canonUtf8Cluster)[0])
 		block := font.Block(firstCodepoint)
 		glyphDataOffset := rb.FindDataOffset(block, canonUtf8Cluster)
-		// Add entry for alias grapheme cluster using same data offset
+		// Add entry for alias grapheme cluster using same data offset.
+		// Important note: the Unicode block for the first codepoint of
+		// a Form C vs. Form D normalization may be *different*!
 		aliasUtf8Cluster := font.StringFromHexGC(gcAlias.AliasHex)
+		firstCodepoint = uint32([]rune(aliasUtf8Cluster)[0])
+		block = font.Block(firstCodepoint)
 		aliasEntry := ClusterOffsetEntry{
 			murmur3(aliasUtf8Cluster, 0),
 			aliasUtf8Cluster,
@@ -307,6 +311,26 @@ func (coIndex BlockIndex) RustCodeForOffsets() string {
 		rustCode = append(rustCode, fmt.Sprintf("%-5s // %s", offset, label))
 	}
 	return strings.Join(rustCode, "\n    ")
+}
+
+// Make a grapheme cluster length list for a BlockIndex. The point of this is to
+// facilitate efficient greedy matching. For example, when the index for a block
+// has grapheme clusters of length 1 or 5 codepoints long, the grapheme cluster
+// matching code for that block need not look ahead beyond 5 codepoints.
+func (bDex BlockIndex) ClusterLengthList() []int {
+	// Make a histogram
+	blockHisto := map[int]int{}
+	for _, entry := range bDex {
+		codepoints := []rune(entry.Cluster)
+		blockHisto[len(codepoints)] += 1
+	}
+	// Reduce histogram to a descending sorted list of cluster lengths
+	gcLenList := []int{}
+	for gcLen, _ := range blockHisto {
+		gcLenList = append(gcLenList, gcLen)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(gcLenList)))
+	return gcLenList
 }
 
 // Print usage message
@@ -373,7 +397,8 @@ const dataTemplate = `/// Return Okay(offset into DATA[]) for start of blit patt
 /// check to see whether the first character falls into one of the codepoint ranges
 /// for Unicode blocks included in this font.
 ///
-pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFound> {
+/// Returns: Option<(blit pattern offset into DATA, bytes of cluster used by match)>
+pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::GlyphNotFound> {
     let first_char: u32;
     match cluster.chars().next() {
         Some(c) => first_char = c as u32,
@@ -383,7 +408,12 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFo
         {{ range $_, $k := .RB.IndexKeys -}}
         {{- with $dex := index $.RB.Index $k -}}
         0x{{printf "%X" $k.Low}}..=0x{{printf "%X" $k.High}} => {
-            find_pattern(cluster, &HASH_{{$k.Name}}, &OFFSET_{{$k.Name}})
+            {{ range $_, $gcLen := $dex.ClusterLengthList -}}
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_{{$k.Name}}, &OFFSET_{{$k.Name}}, {{$gcLen}}) {
+                Ok((offset, bytes_used))
+            } else {{ end }}{
+                Err(super::GlyphNotFound)
+            }
         }
         {{ end -}}
         {{- end -}}
@@ -391,13 +421,14 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFo
     };
 }
 
-/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster
-fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize]) -> Result<usize, super::GlyphNotFound> {
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize], limit: u32) -> Option<(usize, usize)> {
     let seed = 0;
-    let key = super::murmur3(cluster, seed);
+    let (key, bytes_hashed) = super::murmur3(cluster, seed, limit);
     match hash.binary_search(&key) {
-        Ok(index) => return Ok(offset[index]),
-        _ => Err(super::GlyphNotFound),
+        Ok(index) => return Some((offset[index], bytes_hashed)),
+        _ => None,
     }
 }
 

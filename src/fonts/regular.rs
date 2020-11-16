@@ -26,7 +26,8 @@ pub const MAX_HEIGHT: u8 = 30;
 /// check to see whether the first character falls into one of the codepoint ranges
 /// for Unicode blocks included in this font.
 ///
-pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFound> {
+/// Returns: Option<(blit pattern offset into DATA, bytes of cluster used by match)>
+pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::GlyphNotFound> {
     let first_char: u32;
     match cluster.chars().next() {
         Some(c) => first_char = c as u32,
@@ -34,74 +35,122 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<usize, super::GlyphNotFo
     }
     return match first_char {
         0x0..=0x7F => {
-            find_pattern(cluster, &HASH_BASIC_LATIN, &OFFSET_BASIC_LATIN)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_BASIC_LATIN, &OFFSET_BASIC_LATIN, 2) {
+                Ok((offset, bytes_used))
+            } else if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_BASIC_LATIN, &OFFSET_BASIC_LATIN, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0x80..=0xFF => {
-            find_pattern(cluster, &HASH_LATIN_1_SUPPLEMENT, &OFFSET_LATIN_1_SUPPLEMENT)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_LATIN_1_SUPPLEMENT, &OFFSET_LATIN_1_SUPPLEMENT, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0x100..=0x17F => {
-            find_pattern(cluster, &HASH_LATIN_EXTENDED_A, &OFFSET_LATIN_EXTENDED_A)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_LATIN_EXTENDED_A, &OFFSET_LATIN_EXTENDED_A, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0x2000..=0x206F => {
-            find_pattern(cluster, &HASH_GENERAL_PUNCTUATION, &OFFSET_GENERAL_PUNCTUATION)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_GENERAL_PUNCTUATION, &OFFSET_GENERAL_PUNCTUATION, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0x20A0..=0x20CF => {
-            find_pattern(cluster, &HASH_CURRENCY_SYMBOLS, &OFFSET_CURRENCY_SYMBOLS)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_CURRENCY_SYMBOLS, &OFFSET_CURRENCY_SYMBOLS, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0xE000..=0xF8FF => {
-            find_pattern(cluster, &HASH_PRIVATE_USE_AREA, &OFFSET_PRIVATE_USE_AREA)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_PRIVATE_USE_AREA, &OFFSET_PRIVATE_USE_AREA, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         0xFFF0..=0xFFFF => {
-            find_pattern(cluster, &HASH_SPECIALS, &OFFSET_SPECIALS)
+            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_SPECIALS, &OFFSET_SPECIALS, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
         }
         _ => Err(super::GlyphNotFound),
     };
 }
 
-/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster
-fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize]) -> Result<usize, super::GlyphNotFound> {
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize], limit: u32) -> Option<(usize, usize)> {
     let seed = 0;
-    let key = super::murmur3(cluster, seed);
+    let (key, bytes_hashed) = super::murmur3(cluster, seed, limit);
     match hash.binary_search(&key) {
-        Ok(index) => return Ok(offset[index]),
-        _ => Err(super::GlyphNotFound),
+        Ok(index) => return Some((offset[index], bytes_hashed)),
+        _ => None,
     }
 }
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_BASIC_LATIN
-const HASH_BASIC_LATIN: [u32; 95] = [
+const HASH_BASIC_LATIN: [u32; 148] = [
+    0x0323CD4F,  // "ë" 65-308
     0x049BF55E,  // "}"
+    0x0537C05E,  // "È" 45-300
     0x0B9EA876,  // "8"
+    0x0D4E2B64,  // "è" 65-300
+    0x11DDB5BC,  // "Ù" 55-300
+    0x129F2A7F,  // "ã" 61-303
     0x13156136,  // "F"
     0x131AB870,  // "O"
+    0x1403A883,  // "Ê" 45-302
     0x1586C0AA,  // "j"
     0x1672836B,  // "`"
     0x16F9A05F,  // "#"
     0x18D53BB6,  // "("
+    0x198B90FC,  // "ù" 75-300
     0x1BF82D35,  // "y"
+    0x1C40E42F,  // "Ö" 4F-308
     0x1CFCD293,  // ")"
+    0x1F2B17F3,  // "Î" 49-302
     0x1F79A4D0,  // "$"
     0x21840E11,  // "q"
     0x22ABE92F,  // "K"
+    0x2379B646,  // "Õ" 4F-303
+    0x24189EC6,  // "ä" 61-308
     0x259E68D3,  // "6"
     0x26FF6E36,  // "3"
     0x2A3184F1,  // "U"
     0x2B038801,  // "a"
     0x2C17F13B,  // "r"
     0x2D2269F8,  // "m"
+    0x30F856B5,  // "Â" 41-302
     0x31099644,  // "t"
     0x315F5687,  // "I"
     0x3673CB35,  // "{"
     0x39BC06BB,  // "L"
+    0x435F26F6,  // "Ñ" 4E-303
     0x43603571,  // "C"
     0x44C216BA,  // "R"
+    0x455E0578,  // "Ü" 55-308
     0x45EF573F,  // ";"
+    0x465D3B9D,  // "í" 69-301
+    0x47EF8034,  // "ÿ" 79-308
     0x4938EA00,  // "7"
     0x4AB0FC13,  // "4"
     0x4BCD3197,  // "A"
     0x4CC5A899,  // "|"
     0x524C4F7E,  // "B"
     0x52D3CB36,  // "%"
+    0x55C7F2AE,  // "ý" 79-301
     0x56DEE618,  // "v"
     0x5A352E5E,  // "c"
     0x5B06F60A,  // "1"
@@ -109,41 +158,66 @@ const HASH_BASIC_LATIN: [u32; 95] = [
     0x5CA0F32F,  // "&"
     0x5FF80125,  // "S"
     0x61901224,  // "5"
+    0x67BD451E,  // "ñ" 6E-303
+    0x681839B8,  // "Ò" 4F-300
     0x68E75BE7,  // "@"
+    0x6C058218,  // "Û" 55-302
     0x6E85A379,  // "x"
     0x72DE1EFB,  // "*"
     0x73688484,  // "p"
     0x7627CA6C,  // "D"
     0x779CDA2E,  // "Y"
+    0x7834A19C,  // "ó" 6F-301
     0x78FD8C32,  // "u"
+    0x7A435EEE,  // "Ï" 49-308
     0x7B6B1369,  // "9"
     0x7BA23029,  // "J"
+    0x7F4EBF76,  // "Ç" 43-327
     0x803AF153,  // "["
     0x804744C4,  // "e"
     0x84510F7D,  // "o"
+    0x8499B628,  // "å" 61-30A
     0x86A8B043,  // ","
     0x8B86BA97,  // "="
     0x8C1A54EE,  // "g"
     0x8C69C315,  // " "
+    0x8C94654B,  // "ê" 65-302
     0x8DB20A6B,  // "!"
+    0x933CEC52,  // "Ä" 41-308
     0x9500C437,  // "<"
     0x9582C02E,  // "G"
     0x98453FD6,  // "?"
+    0x98C6B546,  // "ü" 75-308
     0x99933C47,  // "w"
+    0x9B44CABE,  // "á" 61-301
+    0x9DD6D1DF,  // "â" 61-302
+    0x9F99932F,  // "À" 41-300
+    0xA03D6D22,  // "Å" 41-30A
     0xA13B361A,  // "/"
     0xA1A410C7,  // "2"
+    0xA26A0E29,  // "Ã" 41-303
+    0xA30CAD6B,  // "û" 75-302
     0xA5872342,  // "k"
     0xA891E88A,  // "0"
     0xABE208D0,  // "P"
     0xADABEA12,  // "d"
+    0xADC91A24,  // "ç" 63-327
+    0xAE495307,  // "õ" 6F-303
     0xAF41DB71,  // "]"
     0xB12BF2EE,  // "V"
     0xB35F1351,  // "E"
+    0xB454A383,  // "ú" 75-301
+    0xB5097BAB,  // "ö" 6F-308
     0xB8ED6BE2,  // "X"
+    0xBE856396,  // "ì" 69-300
     0xBFE47D0D,  // "Q"
     0xC06E932F,  // "T"
+    0xC0AFD8ED,  // "Ô" 4F-302
     0xC1209A73,  // "f"
     0xC2DDC575,  // "\""
+    0xC3AB3492,  // "ò" 6F-300
+    0xC57A2C66,  // "Ó" 4F-301
+    0xC5E4D96B,  // "î" 69-302
     0xC890E3DD,  // ">"
     0xC99309A2,  // "-"
     0xC9BEA311,  // "Z"
@@ -153,54 +227,82 @@ const HASH_BASIC_LATIN: [u32; 95] = [
     0xCB7242E0,  // "+"
     0xCD3FDBE3,  // "M"
     0xCE94AE25,  // "b"
+    0xD363E17B,  // "à" 61-300
     0xD4FFA898,  // ":"
     0xD7B03F23,  // "z"
+    0xD822B857,  // "Ì" 49-300
     0xDA2B151D,  // "\\"
     0xDB01AF22,  // "n"
     0xDC135ABD,  // "N"
     0xE2AA1EBB,  // "."
     0xE5CA55BF,  // "i"
     0xE6556D01,  // "h"
+    0xE7C19BA9,  // "é" 65-301
+    0xED67FA54,  // "Ý" 59-301
     0xEF026B52,  // "l"
+    0xEF302693,  // "Í" 49-301
+    0xF04B9422,  // "Ú" 55-301
     0xF0F19A38,  // "~"
     0xF29AB82D,  // "W"
+    0xF31D8BFB,  // "ï" 69-308
+    0xF3A5A351,  // "Á" 41-301
+    0xF3BF2609,  // "É" 45-301
+    0xF85223EB,  // "Ë" 45-308
     0xFC2C2430,  // "^"
+    0xFFF1D70C,  // "ô" 6F-302
 ];
 
 /// Lookup table of blit pattern offsets; sort matches HASH_BASIC_LATIN
-const OFFSET_BASIC_LATIN: [usize; 95] = [
+const OFFSET_BASIC_LATIN: [usize; 148] = [
+    1175, // "ë" 65-308
     597,  // "}"
+    884,  // "È" 45-300
     139,  // "8"
+    1151, // "è" 65-300
+    1023, // "Ù" 55-300
+    1111, // "ã" 61-303
     231,  // "F"
     297,  // "O"
+    902,  // "Ê" 45-302
     477,  // "j"
     419,  // "`"
     7,    // "#"
     42,   // "("
+    1267, // "ù" 75-300
     573,  // "y"
+    998,  // "Ö" 4F-308
     48,   // ")"
+    927,  // "Î" 49-302
     13,   // "$"
     521,  // "q"
     265,  // "K"
+    988,  // "Õ" 4F-303
+    1119, // "ä" 61-308
     123,  // "6"
     98,   // "3"
     348,  // "U"
     421,  // "a"
     528,  // "r"
     493,  // "m"
+    815,  // "Â" 41-302
     540,  // "t"
     254,  // "I"
     588,  // "{"
     273,  // "L"
+    948,  // "Ñ" 4E-303
     208,  // "C"
     323,  // "R"
+    1053, // "Ü" 55-308
     157,  // ";"
+    1186, // "í" 69-301
+    1317, // "ÿ" 79-308
     131,  // "7"
     106,  // "4"
     191,  // "A"
     594,  // "|"
     200,  // "B"
     21,   // "%"
+    1298, // "ý" 79-301
     552,  // "v"
     434,  // "c"
     86,   // "1"
@@ -208,41 +310,66 @@ const OFFSET_BASIC_LATIN: [usize; 95] = [
     30,   // "&"
     331,  // "S"
     115,  // "5"
+    1207, // "ñ" 6E-303
+    958,  // "Ò" 4F-300
     182,  // "@"
+    1043, // "Û" 55-302
     567,  // "x"
     54,   // "*"
     514,  // "p"
     216,  // "D"
     384,  // "Y"
+    1223, // "ó" 6F-301
     546,  // "u"
+    933,  // "Ï" 49-308
     147,  // "9"
     257,  // "J"
+    874,  // "Ç" 43-327
     398,  // "["
     447,  // "e"
     508,  // "o"
+    1126, // "å" 61-30A
     64,   // ","
     165,  // "="
     459,  // "g"
     0,    // " "
+    1167, // "ê" 65-302
     2,    // "!"
+    839,  // "Ä" 41-308
     160,  // "<"
     238,  // "G"
     174,  // "?"
+    1291, // "ü" 75-308
     558,  // "w"
+    1095, // "á" 61-301
+    1103, // "â" 61-302
+    791,  // "À" 41-300
+    850,  // "Å" 41-30A
     70,   // "/"
     90,   // "2"
+    827,  // "Ã" 41-303
+    1283, // "û" 75-302
     483,  // "k"
     78,   // "0"
     305,  // "P"
     440,  // "d"
+    1144, // "ç" 63-327
+    1239, // "õ" 6F-303
     410,  // "]"
     356,  // "V"
     224,  // "E"
+    1275, // "ú" 75-301
+    1247, // "ö" 6F-308
     377,  // "X"
+    1182, // "ì" 69-300
     313,  // "Q"
     339,  // "T"
+    978,  // "Ô" 4F-302
     453,  // "f"
     5,    // "\""
+    1215, // "ò" 6F-300
+    968,  // "Ó" 4F-301
+    1190, // "î" 69-302
     169,  // ">"
     66,   // "-"
     391,  // "Z"
@@ -252,43 +379,43 @@ const OFFSET_BASIC_LATIN: [usize; 95] = [
     59,   // "+"
     280,  // "M"
     427,  // "b"
+    1087, // "à" 61-300
     155,  // ":"
     582,  // "z"
+    919,  // "Ì" 49-300
     402,  // "\\"
     502,  // "n"
     289,  // "N"
     68,   // "."
     474,  // "i"
     467,  // "h"
+    1159, // "é" 65-301
+    1063, // "Ý" 59-301
     490,  // "l"
+    923,  // "Í" 49-301
+    1033, // "Ú" 55-301
     603,  // "~"
     365,  // "W"
+    1195, // "ï" 69-308
+    803,  // "Á" 41-301
+    893,  // "É" 45-301
+    911,  // "Ë" 45-308
     414,  // "^"
+    1231, // "ô" 6F-302
 ];
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_LATIN_1_SUPPLEMENT
-const HASH_LATIN_1_SUPPLEMENT: [u32; 149] = [
+const HASH_LATIN_1_SUPPLEMENT: [u32; 96] = [
     0x00EAC56E,  // "°"
     0x0254FD66,  // "®"
-    0x0323CD4F,  // "ë" 65-308
-    0x0537C05E,  // "È" 45-300
     0x056DE9E6,  // "Î"
     0x06FE368D,  // "Ö"
-    0x0D4E2B64,  // "è" 65-300
-    0x11DDB5BC,  // "Ù" 55-300
-    0x129F2A7F,  // "ã" 61-303
     0x137E3259,  // "Õ"
-    0x1403A883,  // "Ê" 45-302
     0x18E6F281,  // "à"
-    0x198B90FC,  // "ù" 75-300
     0x1A5A66CD,  // "ø"
     0x1B0DE252,  // "¢"
     0x1B43C661,  // "¤"
-    0x1C40E42F,  // "Ö" 4F-308
     0x1C505947,  // "í"
-    0x1F2B17F3,  // "Î" 49-302
-    0x2379B646,  // "Õ" 4F-303
-    0x24189EC6,  // "ä" 61-308
     0x252158D3,  // "¥"
     0x25872B22,  // "ë"
     0x259437AC,  // "§"
@@ -298,7 +425,6 @@ const HASH_LATIN_1_SUPPLEMENT: [u32; 149] = [
     0x278A377A,  // "Ì"
     0x28CA6AD7,  // "Ø"
     0x291E971E,  // "Ï"
-    0x30F856B5,  // "Â" 41-302
     0x3280724D,  // "»"
     0x36953E7B,  // "õ"
     0x388FB155,  // "ï"
@@ -309,90 +435,58 @@ const HASH_LATIN_1_SUPPLEMENT: [u32; 149] = [
     0x3E82329E,  // "û"
     0x402DCFF6,  // "×"
     0x4236CDD1,  // "¾"
-    0x435F26F6,  // "Ñ" 4E-303
     0x44D0C2C4,  // "ê"
     0x450DB83D,  // "Û"
-    0x455E0578,  // "Ü" 55-308
-    0x465D3B9D,  // "í" 69-301
-    0x47EF8034,  // "ÿ" 79-308
     0x4F92356C,  // "µ"
     0x511BCA1D,  // "á"
     0x554A5349,  // "Æ"
-    0x55C7F2AE,  // "ý" 79-301
     0x5E39BCEE,  // "´"
     0x5EB9D2A0,  // "ç"
     0x5EE10367,  // "ò"
     0x62D494F4,  // "Ý"
-    0x67BD451E,  // "ñ" 6E-303
-    0x681839B8,  // "Ò" 4F-300
     0x6984AA2D,  // "Í"
     0x6BA96CC3,  // "Ü"
-    0x6C058218,  // "Û" 55-302
     0x6E3C05CF,  // "ý"
     0x6EF8ED06,  // "\u00AD" Soft Hyphen
     0x6FA3C127,  // "ã"
     0x71EE15F2,  // "Ò"
     0x7619D892,  // "ª"
     0x76554D10,  // "Ç"
-    0x7834A19C,  // "ó" 6F-301
     0x79026F8E,  // "Å"
-    0x7A435EEE,  // "Ï" 49-308
     0x7E2A203C,  // "÷"
-    0x7F4EBF76,  // "Ç" 43-327
     0x839D40CB,  // "£"
-    0x8499B628,  // "å" 61-30A
     0x84FF8F94,  // "Ô"
     0x8AE0A2B9,  // "å"
-    0x8C94654B,  // "ê" 65-302
     0x8D741045,  // "Þ"
     0x8EA3F31F,  // "³"
     0x9194CCB5,  // "¬"
     0x92979158,  // "ô"
-    0x933CEC52,  // "Ä" 41-308
     0x95C4DC63,  // "Ã"
     0x97A9C1DA,  // "¶"
     0x97C63B05,  // "\u00A0" No-Break Space
-    0x98C6B546,  // "ü" 75-308
-    0x9B44CABE,  // "á" 61-301
-    0x9DD6D1DF,  // "â" 61-302
-    0x9F99932F,  // "À" 41-300
-    0xA03D6D22,  // "Å" 41-30A
     0xA10C8120,  // "·"
-    0xA26A0E29,  // "Ã" 41-303
-    0xA30CAD6B,  // "û" 75-302
     0xA5F3368B,  // "¹"
     0xA7883CA5,  // "¸"
     0xA7B0FE42,  // "©"
     0xABF561B2,  // "«"
     0xAD97621D,  // "Ð"
-    0xADC91A24,  // "ç" 63-327
-    0xAE495307,  // "õ" 6F-303
     0xB1A64F1E,  // "Â"
     0xB1BF38B8,  // "º"
-    0xB454A383,  // "ú" 75-301
-    0xB5097BAB,  // "ö" 6F-308
     0xB55DA0FA,  // "î"
     0xB5CA05F5,  // "¦"
     0xB7001103,  // "¡"
     0xB9229669,  // "¿"
     0xBA8E9829,  // "Ä"
     0xBB608964,  // "ú"
-    0xBE856396,  // "ì" 69-300
     0xC0837C42,  // "¼"
-    0xC0AFD8ED,  // "Ô" 4F-302
     0xC0E7AB63,  // "¯"
     0xC20FE7B7,  // "þ"
-    0xC3AB3492,  // "ò" 6F-300
-    0xC57A2C66,  // "Ó" 4F-301
-    0xC5E4D96B,  // "î" 69-302
     0xC6EF143E,  // "ß"
     0xC98BE718,  // "Á"
     0xCAD0511F,  // "é"
     0xCAF24984,  // "Ù"
     0xD040D3E3,  // "è"
-    0xD363E17B,  // "à" 61-300
     0xD4D6097A,  // "Ë"
-    0xD822B857,  // "Ì" 49-300
     0xD83534E2,  // "Ñ"
     0xDD061C7A,  // "²"
     0xDE3FB757,  // "ì"
@@ -400,48 +494,28 @@ const HASH_LATIN_1_SUPPLEMENT: [u32; 149] = [
     0xE2532EDC,  // "ð"
     0xE51FF77C,  // "½"
     0xE5DA3FED,  // "±"
-    0xE7C19BA9,  // "é" 65-301
     0xE9131AA1,  // "ù"
     0xEBC8143D,  // "ö"
     0xEC99A516,  // "À"
-    0xED67FA54,  // "Ý" 59-301
-    0xEF302693,  // "Í" 49-301
-    0xF04B9422,  // "Ú" 55-301
-    0xF31D8BFB,  // "ï" 69-308
-    0xF3A5A351,  // "Á" 41-301
-    0xF3BF2609,  // "É" 45-301
     0xF446CD1A,  // "Ó"
     0xF520EF41,  // "æ"
     0xF64ED921,  // "ñ"
-    0xF85223EB,  // "Ë" 45-308
     0xFB89D3F4,  // "ÿ"
     0xFBFECC1C,  // "Ê"
-    0xFFF1D70C,  // "ô" 6F-302
 ];
 
 /// Lookup table of blit pattern offsets; sort matches HASH_LATIN_1_SUPPLEMENT
-const OFFSET_LATIN_1_SUPPLEMENT: [usize; 149] = [
+const OFFSET_LATIN_1_SUPPLEMENT: [usize; 96] = [
     690,  // "°"
     679,  // "®"
-    1175, // "ë" 65-308
-    884,  // "È" 45-300
     927,  // "Î"
     998,  // "Ö"
-    1151, // "è" 65-300
-    1023, // "Ù" 55-300
-    1111, // "ã" 61-303
     988,  // "Õ"
-    902,  // "Ê" 45-302
     1087, // "à"
-    1267, // "ù" 75-300
     1259, // "ø"
     611,  // "¢"
     626,  // "¤"
-    998,  // "Ö" 4F-308
     1186, // "í"
-    927,  // "Î" 49-302
-    988,  // "Õ" 4F-303
-    1119, // "ä" 61-308
     633,  // "¥"
     1175, // "ë"
     643,  // "§"
@@ -451,7 +525,6 @@ const OFFSET_LATIN_1_SUPPLEMENT: [usize; 149] = [
     919,  // "Ì"
     1013, // "Ø"
     933,  // "Ï"
-    815,  // "Â" 41-302
     740,  // "»"
     1239, // "õ"
     1195, // "ï"
@@ -462,90 +535,58 @@ const OFFSET_LATIN_1_SUPPLEMENT: [usize; 149] = [
     1283, // "û"
     1008, // "×"
     771,  // "¾"
-    948,  // "Ñ" 4E-303
     1167, // "ê"
     1043, // "Û"
-    1053, // "Ü" 55-308
-    1186, // "í" 69-301
-    1317, // "ÿ" 79-308
     707,  // "µ"
     1095, // "á"
     861,  // "Æ"
-    1298, // "ý" 79-301
     705,  // "´"
     1144, // "ç"
     1215, // "ò"
     1063, // "Ý"
-    1207, // "ñ" 6E-303
-    958,  // "Ò" 4F-300
     923,  // "Í"
     1053, // "Ü"
-    1043, // "Û" 55-302
     1298, // "ý"
     677,  // "\u00AD" Soft Hyphen
     1111, // "ã"
     958,  // "Ò"
     664,  // "ª"
     874,  // "Ç"
-    1223, // "ó" 6F-301
     850,  // "Å"
-    933,  // "Ï" 49-308
     1254, // "÷"
-    874,  // "Ç" 43-327
     618,  // "£"
-    1126, // "å" 61-30A
     978,  // "Ô"
     1126, // "å"
-    1167, // "ê" 65-302
     1072, // "Þ"
     702,  // "³"
     674,  // "¬"
     1231, // "ô"
-    839,  // "Ä" 41-308
     827,  // "Ã"
     717,  // "¶"
     606,  // "\u00A0" No-Break Space
-    1291, // "ü" 75-308
-    1095, // "á" 61-301
-    1103, // "â" 61-302
-    791,  // "À" 41-300
-    850,  // "Å" 41-30A
     728,  // "·"
-    827,  // "Ã" 41-303
-    1283, // "û" 75-302
     732,  // "¹"
     730,  // "¸"
     655,  // "©"
     669,  // "«"
     939,  // "Ð"
-    1144, // "ç" 63-327
-    1239, // "õ" 6F-303
     815,  // "Â"
     735,  // "º"
-    1275, // "ú" 75-301
-    1247, // "ö" 6F-308
     1190, // "î"
     640,  // "¦"
     608,  // "¡"
     784,  // "¿"
     839,  // "Ä"
     1275, // "ú"
-    1182, // "ì" 69-300
     745,  // "¼"
-    978,  // "Ô" 4F-302
     688,  // "¯"
     1309, // "þ"
-    1215, // "ò" 6F-300
-    968,  // "Ó" 4F-301
-    1190, // "î" 69-302
     1079, // "ß"
     803,  // "Á"
     1159, // "é"
     1023, // "Ù"
     1151, // "è"
-    1087, // "à" 61-300
     911,  // "Ë"
-    919,  // "Ì" 49-300
     948,  // "Ñ"
     699,  // "²"
     1182, // "ì"
@@ -553,23 +594,14 @@ const OFFSET_LATIN_1_SUPPLEMENT: [usize; 149] = [
     1200, // "ð"
     758,  // "½"
     693,  // "±"
-    1159, // "é" 65-301
     1267, // "ù"
     1247, // "ö"
     791,  // "À"
-    1063, // "Ý" 59-301
-    923,  // "Í" 49-301
-    1033, // "Ú" 55-301
-    1195, // "ï" 69-308
-    803,  // "Á" 41-301
-    893,  // "É" 45-301
     968,  // "Ó"
     1135, // "æ"
     1207, // "ñ"
-    911,  // "Ë" 45-308
     1317, // "ÿ"
     902,  // "Ê"
-    1231, // "ô" 6F-302
 ];
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_LATIN_EXTENDED_A
