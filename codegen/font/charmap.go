@@ -69,39 +69,42 @@ type CharSpec struct {
 	Col        int
 }
 
-// Parse and return the first codepoint of a grapheme cluster string.
+// Parse and return the first codepoint of a hex grapheme cluster string.
 // For example, "1f3c4-200d-2640-fe0f" -> 0x1F3C4
 func (cs CharSpec) FirstCodepoint() uint32 {
-	base := 16
-	bits := 32
-	hexCodepoints := strings.Split(cs.HexCluster, "-")
-	n, err := strconv.ParseUint(hexCodepoints[0], base, bits)
-	if len(hexCodepoints) < 1 || err != nil {
-		panic(fmt.Errorf("unexpected value for CharSpec.HexCluster: %q", cs))
-	}
-	return uint32(n)
+	utf8 := StringFromHexGC(cs.HexCluster)
+	codepoints := []rune(utf8)
+	return uint32(codepoints[0])
 }
 
-// Convert a grapheme cluster string from hexidecimal codepoints to a string.
+// Convert a hex grapheme cluster string to a regular utf8 string.
 // For example, "1f3c4-200d-2640-fe0f" -> "\U0001F3C4\u200d\u2640\ufe0f"
 func (cs CharSpec) GraphemeCluster() string {
+	return StringFromHexGC(cs.HexCluster)
+}
+
+// Parse a hex-codepoint format grapheme cluster into a utf-8 string
+// For example, "1f3c4-200d-2640-fe0f" -> "\U0001F3C4\u200d\u2640\ufe0f"
+func StringFromHexGC(hexGC string) string {
 	base := 16
 	bits := 32
 	cluster := ""
-	hexCodepoints := strings.Split(cs.HexCluster, "-")
+	hexCodepoints := strings.Split(hexGC, "-")
 	if len(hexCodepoints) < 1 {
-		panic(fmt.Errorf("unexpected value for CharSpec.HexCluster: %q", cs))
+		panic(fmt.Errorf("unexpected value for hexGC: %q", hexGC))
 	}
 	for _, hc := range hexCodepoints {
 		n, err := strconv.ParseUint(hc, base, bits)
 		if err != nil {
-			panic(fmt.Errorf("unexpected value for CharSpec.HexCluster: %q", cs))
+			panic(fmt.Errorf("unexpected value for hexGC: %q", hexGC))
 		}
 		cluster += string(rune(n))
 	}
 	return cluster
 }
 
+// Return mapping of hex-codepoint format grapheme clusters to grid coordinates
+// in a glyph sprite sheet for the system latin fonts (Bold & Regular)
 func SysLatinMap() []CharSpec {
 	return []CharSpec{
 		// Unicode Basic Latin block
@@ -336,5 +339,73 @@ func SysLatinMap() []CharSpec {
 
 		// Unicode Specials Block
 		CharSpec{"FFFD", 0, 15}, // "�"
+	}
+}
+
+// Holds an alias for a hex-codepoint grapheme cluster in the primary index
+type GCAlias struct {
+	CanonHex string // Cannonical form in the index (has a CharSpec)
+	AliasHex string // This one should map to same glyph as CanonHex
+}
+
+// Return a list of grapheme cluster aliases for the system latin font so that
+// Unicode normalization form D (decomposed) grapheme clusters can be associated
+// with their corresponding normalization form C (composed) grapheme clusters in
+// the primary index. This helps avoid the need to normalize UTF-8 strings.
+func SysLatinAliases() []GCAlias {
+	return []GCAlias{
+		GCAlias{"C0", "41-300"}, // nfc: [C0, À],  nfd: [41-300, À]
+		GCAlias{"C1", "41-301"}, // nfc: [C1, Á],  nfd: [41-301, Á]
+		GCAlias{"C2", "41-302"}, // nfc: [C2, Â],  nfd: [41-302, Â]
+		GCAlias{"C3", "41-303"}, // nfc: [C3, Ã],  nfd: [41-303, Ã]
+		GCAlias{"C4", "41-308"}, // nfc: [C4, Ä],  nfd: [41-308, Ä]
+		GCAlias{"C5", "41-30A"}, // nfc: [C5, Å],  nfd: [41-30A, Å]
+		GCAlias{"C7", "43-327"}, // nfc: [C7, Ç],  nfd: [43-327, Ç]
+		GCAlias{"C8", "45-300"}, // nfc: [C8, È],  nfd: [45-300, È]
+		GCAlias{"C9", "45-301"}, // nfc: [C9, É],  nfd: [45-301, É]
+		GCAlias{"CA", "45-302"}, // nfc: [CA, Ê],  nfd: [45-302, Ê]
+		GCAlias{"CB", "45-308"}, // nfc: [CB, Ë],  nfd: [45-308, Ë]
+		GCAlias{"CC", "49-300"}, // nfc: [CC, Ì],  nfd: [49-300, Ì]
+		GCAlias{"CD", "49-301"}, // nfc: [CD, Í],  nfd: [49-301, Í]
+		GCAlias{"CE", "49-302"}, // nfc: [CE, Î],  nfd: [49-302, Î]
+		GCAlias{"CF", "49-308"}, // nfc: [CF, Ï],  nfd: [49-308, Ï]
+		GCAlias{"D1", "4E-303"}, // nfc: [D1, Ñ],  nfd: [4E-303, Ñ]
+		GCAlias{"D2", "4F-300"}, // nfc: [D2, Ò],  nfd: [4F-300, Ò]
+		GCAlias{"D3", "4F-301"}, // nfc: [D3, Ó],  nfd: [4F-301, Ó]
+		GCAlias{"D4", "4F-302"}, // nfc: [D4, Ô],  nfd: [4F-302, Ô]
+		GCAlias{"D5", "4F-303"}, // nfc: [D5, Õ],  nfd: [4F-303, Õ]
+		GCAlias{"D6", "4F-308"}, // nfc: [D6, Ö],  nfd: [4F-308, Ö]
+		GCAlias{"D9", "55-300"}, // nfc: [D9, Ù],  nfd: [55-300, Ù]
+		GCAlias{"DA", "55-301"}, // nfc: [DA, Ú],  nfd: [55-301, Ú]
+		GCAlias{"DB", "55-302"}, // nfc: [DB, Û],  nfd: [55-302, Û]
+		GCAlias{"DC", "55-308"}, // nfc: [DC, Ü],  nfd: [55-308, Ü]
+		GCAlias{"DD", "59-301"}, // nfc: [DD, Ý],  nfd: [59-301, Ý]
+		GCAlias{"E0", "61-300"}, // nfc: [E0, à],  nfd: [61-300, à]
+		GCAlias{"E1", "61-301"}, // nfc: [E1, á],  nfd: [61-301, á]
+		GCAlias{"E2", "61-302"}, // nfc: [E2, â],  nfd: [61-302, â]
+		GCAlias{"E3", "61-303"}, // nfc: [E3, ã],  nfd: [61-303, ã]
+		GCAlias{"E4", "61-308"}, // nfc: [E4, ä],  nfd: [61-308, ä]
+		GCAlias{"E5", "61-30A"}, // nfc: [E5, å],  nfd: [61-30A, å]
+		GCAlias{"E7", "63-327"}, // nfc: [E7, ç],  nfd: [63-327, ç]
+		GCAlias{"E8", "65-300"}, // nfc: [E8, è],  nfd: [65-300, è]
+		GCAlias{"E9", "65-301"}, // nfc: [E9, é],  nfd: [65-301, é]
+		GCAlias{"EA", "65-302"}, // nfc: [EA, ê],  nfd: [65-302, ê]
+		GCAlias{"EB", "65-308"}, // nfc: [EB, ë],  nfd: [65-308, ë]
+		GCAlias{"EC", "69-300"}, // nfc: [EC, ì],  nfd: [69-300, ì]
+		GCAlias{"ED", "69-301"}, // nfc: [ED, í],  nfd: [69-301, í]
+		GCAlias{"EE", "69-302"}, // nfc: [EE, î],  nfd: [69-302, î]
+		GCAlias{"EF", "69-308"}, // nfc: [EF, ï],  nfd: [69-308, ï]
+		GCAlias{"F1", "6E-303"}, // nfc: [F1, ñ],  nfd: [6E-303, ñ]
+		GCAlias{"F2", "6F-300"}, // nfc: [F2, ò],  nfd: [6F-300, ò]
+		GCAlias{"F3", "6F-301"}, // nfc: [F3, ó],  nfd: [6F-301, ó]
+		GCAlias{"F4", "6F-302"}, // nfc: [F4, ô],  nfd: [6F-302, ô]
+		GCAlias{"F5", "6F-303"}, // nfc: [F5, õ],  nfd: [6F-303, õ]
+		GCAlias{"F6", "6F-308"}, // nfc: [F6, ö],  nfd: [6F-308, ö]
+		GCAlias{"F9", "75-300"}, // nfc: [F9, ù],  nfd: [75-300, ù]
+		GCAlias{"FA", "75-301"}, // nfc: [FA, ú],  nfd: [75-301, ú]
+		GCAlias{"FB", "75-302"}, // nfc: [FB, û],  nfd: [75-302, û]
+		GCAlias{"FC", "75-308"}, // nfc: [FC, ü],  nfd: [75-308, ü]
+		GCAlias{"FD", "79-301"}, // nfc: [FD, ý],  nfd: [79-301, ý]
+		GCAlias{"FF", "79-308"}, // nfc: [FF, ÿ],  nfd: [79-308, ÿ]
 	}
 }

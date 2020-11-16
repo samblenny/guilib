@@ -55,11 +55,11 @@ func codegen() {
 		var data string
 		switch f.Name {
 		case "Emoji":
-			data = genRustyFontData(f, []font.CharSpec{})
+			data = genRustyFontData(f, []font.CharSpec{}, []font.GCAlias{})
 		case "Bold":
-			data = genRustyFontData(f, font.SysLatinMap())
+			data = genRustyFontData(f, font.SysLatinMap(), font.SysLatinAliases())
 		case "Regular":
-			data = genRustyFontData(f, font.SysLatinMap())
+			data = genRustyFontData(f, font.SysLatinMap(), font.SysLatinAliases())
 		default:
 			panic("unexpected FontSpec.Name")
 		}
@@ -77,7 +77,7 @@ func codegen() {
 }
 
 // Generate rust code for glyph blit pattern data and related grapheme cluster index
-func genRustyFontData(fs font.FontSpec, csList []font.CharSpec) string {
+func genRustyFontData(fs font.FontSpec, csList []font.CharSpec, aliasList []font.GCAlias) string {
 	if len(csList) == 0 {
 		return fmt.Sprintf("/* TODO: %s data */", fs.Name)
 	}
@@ -85,6 +85,7 @@ func genRustyFontData(fs font.FontSpec, csList []font.CharSpec) string {
 	pl := patternListFromSpriteSheet(fs, csList)
 	// Make rust code for the blit pattern DATA array, plus an index list
 	rb := rustyBlitsFromPatternList(pl)
+	rb.AddAliasesToIndex(aliasList)
 	return renderTemplate(dataTemplate, "data", struct{ RB RustyBlits }{rb})
 }
 
@@ -121,10 +122,7 @@ func rustyBlitsFromPatternList(pl []font.BlitPattern) RustyBlits {
 		rb.Index[block] = append(rb.Index[block], indexEntry)
 		rb.DataLen += len(p.Bytes)
 	}
-	// Sort the index for each block
-	for _, v := range rb.Index {
-		sort.Slice(v, func(i, j int) bool { return v[i].M3Hash < v[j].M3Hash })
-	}
+	rb.SortIndex()
 	return rb
 }
 
@@ -176,7 +174,19 @@ func labelForCluster(c string) string {
 	case "\u00a0":
 		return "\"\\u00A0\" No-Break Space"
 	default:
-		return fmt.Sprintf("%q", c)
+		// For single codepoint grapheme clusters, such as Normalization
+		// Form C, just print the character. But, for multi-codepoint
+		// grapheme clusters, also print the hex cluster string
+		s := fmt.Sprintf("%q", c)
+		if len([]rune(c)) > 1 {
+			hexCodepoints := []string{}
+			for _, r := range []rune(c) {
+				hcp := fmt.Sprintf("%X", uint32(r))
+				hexCodepoints = append(hexCodepoints, hcp)
+			}
+			s += " " + strings.Join(hexCodepoints, "-")
+		}
+		return s
 	}
 }
 
@@ -220,8 +230,52 @@ type BlockIndex []ClusterOffsetEntry
 // An index entry for translating from grapheme cluster to blit pattern
 type ClusterOffsetEntry struct {
 	M3Hash     uint32
-	Cluster    string
+	Cluster    string // Parsed UTF-8 form (not hex codepoints)
 	DataOffset int
+}
+
+// Add a list of grapheme cluster aliases to a RustyBlits.Index FontIndex
+func (rb RustyBlits) AddAliasesToIndex(aliasList []font.GCAlias) {
+	for _, gcAlias := range aliasList {
+		// Find the glyph pattern data offset for the cannonical grapheme cluster
+		canonUtf8Cluster := font.StringFromHexGC(gcAlias.CanonHex)
+		firstCodepoint := uint32([]rune(canonUtf8Cluster)[0])
+		block := font.Block(firstCodepoint)
+		glyphDataOffset := rb.FindDataOffset(block, canonUtf8Cluster)
+		// Add entry for alias grapheme cluster using same data offset
+		aliasUtf8Cluster := font.StringFromHexGC(gcAlias.AliasHex)
+		aliasEntry := ClusterOffsetEntry{
+			murmur3(aliasUtf8Cluster, 0),
+			aliasUtf8Cluster,
+			glyphDataOffset,
+		}
+		// Insert Alias entry. Inserting each entry individually and
+		// sorting after each one is an inefficient algorithm, but I'm
+		// guessing the lists will be short enough that it won't matter.
+		rb.Index[block] = append(rb.Index[block], aliasEntry)
+		rb.SortIndex()
+	}
+}
+
+// Find data offset for the grapheme cluster in a RustyBlits.index, or panic
+func (rb RustyBlits) FindDataOffset(block font.UBlock, utf8Cluster string) int {
+	dex := rb.Index[block]
+	hash := murmur3(utf8Cluster, 0)
+	n := sort.Search(len(dex), func(i int) bool { return dex[i].M3Hash >= hash })
+	if n == len(dex) || dex[n].M3Hash != hash {
+		fmt.Printf("\nblock: %X..%X %s\n", block.Low, block.High, block.Name)
+		fmt.Printf("rb.Index[block]:\n%+q\n", rb.Index[block])
+		fmt.Printf("n := Search(key):\n  index[n]: %v,  key: %q\n", dex[n].M3Hash, utf8Cluster)
+		panic(fmt.Errorf("Grapheme cluster %q was not in rb.Index[block]", utf8Cluster))
+	}
+	return dex[n].DataOffset
+}
+
+// Sort the index for each Unicode block of a RustyBlits.Index FontIndex
+func (rb RustyBlits) SortIndex() {
+	for _, v := range rb.Index {
+		sort.Slice(v, func(i, j int) bool { return v[i].M3Hash < v[j].M3Hash })
+	}
 }
 
 func (rb RustyBlits) IndexKeys() []font.UBlock {
