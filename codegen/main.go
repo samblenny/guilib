@@ -40,10 +40,13 @@ const outPath = "../src/fonts"
 const emojiIndexPath = "img/emoji_13_0_index.txt"
 const emojiAliasPath = "img/emoji_13_0_aliases.txt"
 
+// Seed for Murmur3 hashes; in the event of hash collisions, change this
+const Murmur3Seed uint32 = 0
+
 // Spec for how to generate font source code files from glyph grid sprite sheets
 func fonts() []font.FontSpec {
 	return []font.FontSpec{
-		font.FontSpec{"Emoji", "img/emoji_13_0_48x48_o3x3.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
+		font.FontSpec{"Emoji", "img/emoji_13_0_32x32_o3x3.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
 		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
 		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
 	}
@@ -86,7 +89,10 @@ func genRustyFontData(fs font.FontSpec, csList []font.CharSpec, aliasList []font
 	// Make rust code for the blit pattern DATA array, plus an index list
 	rb := rustyBlitsFromPatternList(pl)
 	rb.AddAliasesToIndex(aliasList)
-	return renderTemplate(dataTemplate, "data", struct{ RB RustyBlits }{rb})
+	return renderTemplate(dataTemplate, "data", struct {
+		RB     RustyBlits
+		M3Seed uint32
+	}{rb, 0})
 }
 
 // Extract glyph sprites from a PNG grid and pack them into a list of blit pattern objects
@@ -114,7 +120,7 @@ func rustyBlitsFromPatternList(pl []font.BlitPattern) RustyBlits {
 		rb.Code += font.ConvertPatternToRust(p, comment)
 		// Update the block index with the correct offset (DATA[n]) for pattern header
 		indexEntry := ClusterOffsetEntry{
-			murmur3(p.CS.GraphemeCluster(), 0),
+			murmur3(p.CS.GraphemeCluster(), Murmur3Seed),
 			p.CS.GraphemeCluster(),
 			rb.DataLen,
 		}
@@ -249,7 +255,7 @@ func (rb RustyBlits) AddAliasesToIndex(aliasList []font.GCAlias) {
 		firstCodepoint = uint32([]rune(aliasUtf8Cluster)[0])
 		block = font.Block(firstCodepoint)
 		aliasEntry := ClusterOffsetEntry{
-			murmur3(aliasUtf8Cluster, 0),
+			murmur3(aliasUtf8Cluster, Murmur3Seed),
 			aliasUtf8Cluster,
 			glyphDataOffset,
 		}
@@ -264,7 +270,7 @@ func (rb RustyBlits) AddAliasesToIndex(aliasList []font.GCAlias) {
 // Find data offset for the grapheme cluster in a RustyBlits.index, or panic
 func (rb RustyBlits) FindDataOffset(block font.UBlock, utf8Cluster string) int {
 	dex := rb.Index[block]
-	hash := murmur3(utf8Cluster, 0)
+	hash := murmur3(utf8Cluster, Murmur3Seed)
 	n := sort.Search(len(dex), func(i int) bool { return dex[i].M3Hash >= hash })
 	if n == len(dex) || dex[n].M3Hash != hash {
 		fmt.Printf("\nblock: %X..%X %s\n", block.Low, block.High, block.Name)
@@ -346,7 +352,8 @@ func usage() {
 
 // Return a string from rendering the given template and context data
 func renderTemplate(templateString string, name string, context interface{}) string {
-	t := template.Must(template.New(name).Parse(templateString))
+	fmap := template.FuncMap{"ToLower": strings.ToLower}
+	t := template.Must(template.New(name).Funcs(fmap).Parse(templateString))
 	var buf bytes.Buffer
 	err := t.Execute(&buf, context)
 	if err != nil {
@@ -391,7 +398,10 @@ pub const MAX_HEIGHT: u8 = {{.Font.Size}};
 `
 
 // Template with rust source code for the data and index portion of a font file
-const dataTemplate = `/// Return Okay(offset into DATA[]) for start of blit pattern for grapheme cluster.
+const dataTemplate = `/// Seed for Murmur3 hashes in the HASH_* index arrays
+pub const M3_SEED: u32 = {{.M3Seed}};
+
+/// Return Okay(offset into DATA[]) for start of blit pattern for grapheme cluster.
 ///
 /// Before doing an expensive lookup for the whole cluster, this does a pre-filter
 /// check to see whether the first character falls into one of the codepoint ranges
@@ -409,7 +419,7 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::G
         {{- with $dex := index $.RB.Index $k -}}
         0x{{printf "%X" $k.Low}}..=0x{{printf "%X" $k.High}} => {
             {{ range $_, $gcLen := $dex.ClusterLengthList -}}
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_{{$k.Name}}, &OFFSET_{{$k.Name}}, {{$gcLen}}) {
+            if let Some((offset, bytes_used)) = find_{{ToLower $k.Name}}(cluster, {{$gcLen}}) {
                 Ok((offset, bytes_used))
             } else {{ end }}{
                 Err(super::GlyphNotFound)
@@ -421,19 +431,18 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::G
     };
 }
 
+{{ range $_, $k := .RB.IndexKeys -}}
+{{- with $dex := index $.RB.Index $k -}}
 /// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
 /// Only attempt to match grapheme clusters of length limit codepoints.
-fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize], limit: u32) -> Option<(usize, usize)> {
-    let seed = 0;
-    let (key, bytes_hashed) = super::murmur3(cluster, seed, limit);
-    match hash.binary_search(&key) {
-        Ok(index) => return Some((offset[index], bytes_hashed)),
+fn find_{{ToLower $k.Name}}(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_{{$k.Name}}.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_{{$k.Name}}[index], bytes_hashed)),
         _ => None,
     }
 }
 
-{{ range $_, $k := .RB.IndexKeys -}}
-{{- with $dex := index $.RB.Index $k -}}
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_{{$k.Name}}
 const HASH_{{$k.Name}}: [u32; {{len $dex}}] = [
     {{$dex.RustCodeForClusterHashes}}

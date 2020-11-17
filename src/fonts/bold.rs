@@ -20,6 +20,9 @@
 /// This will be true: h + y_offset <= MAX_HEIGHT
 pub const MAX_HEIGHT: u8 = 30;
 
+/// Seed for Murmur3 hashes in the HASH_* index arrays
+pub const M3_SEED: u32 = 0;
+
 /// Return Okay(offset into DATA[]) for start of blit pattern for grapheme cluster.
 ///
 /// Before doing an expensive lookup for the whole cluster, this does a pre-filter
@@ -35,51 +38,51 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::G
     }
     return match first_char {
         0x0..=0x7F => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_BASIC_LATIN, &OFFSET_BASIC_LATIN, 2) {
+            if let Some((offset, bytes_used)) = find_basic_latin(cluster, 2) {
                 Ok((offset, bytes_used))
-            } else if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_BASIC_LATIN, &OFFSET_BASIC_LATIN, 1) {
+            } else if let Some((offset, bytes_used)) = find_basic_latin(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0x80..=0xFF => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_LATIN_1_SUPPLEMENT, &OFFSET_LATIN_1_SUPPLEMENT, 1) {
+            if let Some((offset, bytes_used)) = find_latin_1_supplement(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0x100..=0x17F => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_LATIN_EXTENDED_A, &OFFSET_LATIN_EXTENDED_A, 1) {
+            if let Some((offset, bytes_used)) = find_latin_extended_a(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0x2000..=0x206F => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_GENERAL_PUNCTUATION, &OFFSET_GENERAL_PUNCTUATION, 1) {
+            if let Some((offset, bytes_used)) = find_general_punctuation(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0x20A0..=0x20CF => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_CURRENCY_SYMBOLS, &OFFSET_CURRENCY_SYMBOLS, 1) {
+            if let Some((offset, bytes_used)) = find_currency_symbols(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0xE000..=0xF8FF => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_PRIVATE_USE_AREA, &OFFSET_PRIVATE_USE_AREA, 1) {
+            if let Some((offset, bytes_used)) = find_private_use_area(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
             }
         }
         0xFFF0..=0xFFFF => {
-            if let Some((offset, bytes_used)) = find_pattern(cluster, &HASH_SPECIALS, &OFFSET_SPECIALS, 1) {
+            if let Some((offset, bytes_used)) = find_specials(cluster, 1) {
                 Ok((offset, bytes_used))
             } else {
                 Err(super::GlyphNotFound)
@@ -91,11 +94,10 @@ pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::G
 
 /// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
 /// Only attempt to match grapheme clusters of length limit codepoints.
-fn find_pattern(cluster: &str, hash: &[u32], offset: &[usize], limit: u32) -> Option<(usize, usize)> {
-    let seed = 0;
-    let (key, bytes_hashed) = super::murmur3(cluster, seed, limit);
-    match hash.binary_search(&key) {
-        Ok(index) => return Some((offset[index], bytes_hashed)),
+fn find_basic_latin(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_BASIC_LATIN.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_BASIC_LATIN[index], bytes_hashed)),
         _ => None,
     }
 }
@@ -404,6 +406,16 @@ const OFFSET_BASIC_LATIN: [usize; 148] = [
     1316, // "ô" 6F-302
 ];
 
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_latin_1_supplement(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_LATIN_1_SUPPLEMENT.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_LATIN_1_SUPPLEMENT[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_LATIN_1_SUPPLEMENT
 const HASH_LATIN_1_SUPPLEMENT: [u32; 96] = [
     0x00EAC56E,  // "°"
@@ -604,6 +616,16 @@ const OFFSET_LATIN_1_SUPPLEMENT: [usize; 96] = [
     958,  // "Ê"
 ];
 
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_latin_extended_a(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_LATIN_EXTENDED_A.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_LATIN_EXTENDED_A[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_LATIN_EXTENDED_A
 const HASH_LATIN_EXTENDED_A: [u32; 2] = [
     0x1A01594C,  // "Œ"
@@ -615,6 +637,16 @@ const OFFSET_LATIN_EXTENDED_A: [usize; 2] = [
     1421, // "Œ"
     1433, // "œ"
 ];
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_general_punctuation(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_GENERAL_PUNCTUATION.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_GENERAL_PUNCTUATION[index], bytes_hashed)),
+        _ => None,
+    }
+}
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_GENERAL_PUNCTUATION
 const HASH_GENERAL_PUNCTUATION: [u32; 11] = [
@@ -646,6 +678,16 @@ const OFFSET_GENERAL_PUNCTUATION: [usize; 11] = [
     1445, // "’"
 ];
 
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_currency_symbols(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_CURRENCY_SYMBOLS.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_CURRENCY_SYMBOLS[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_CURRENCY_SYMBOLS
 const HASH_CURRENCY_SYMBOLS: [u32; 1] = [
     0x1ACA36BB,  // "€"
@@ -655,6 +697,16 @@ const HASH_CURRENCY_SYMBOLS: [u32; 1] = [
 const OFFSET_CURRENCY_SYMBOLS: [usize; 1] = [
     1479, // "€"
 ];
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_private_use_area(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_PRIVATE_USE_AREA.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_PRIVATE_USE_AREA[index], bytes_hashed)),
+        _ => None,
+    }
+}
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_PRIVATE_USE_AREA
 const HASH_PRIVATE_USE_AREA: [u32; 13] = [
@@ -689,6 +741,16 @@ const OFFSET_PRIVATE_USE_AREA: [usize; 13] = [
     1488, // "\uE700" Battery_05
     1528, // "\uE704" Battery_99
 ];
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_specials(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_SPECIALS.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_SPECIALS[index], bytes_hashed)),
+        _ => None,
+    }
+}
 
 /// Index of murmur3(grapheme cluster); sort matches OFFSET_SPECIALS
 const HASH_SPECIALS: [u32; 1] = [
