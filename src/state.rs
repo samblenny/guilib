@@ -70,6 +70,10 @@ pub struct Context<'a> {
     pub status_time: &'a str,
     // Home screen sample text
     pub note: &'a str,
+    pub sas1: &'a str,
+    pub sas2: &'a str,
+    pub sas3: &'a str,
+    pub sas4: &'a str,
     // Character and string buffer for a minimalist FIFO string editor
     pub char_buf: [char; CHAR_BUF_SIZE],
     pub char_buf_end: usize,
@@ -90,6 +94,10 @@ impl Context<'_> {
             status_title: &"home",
             status_time: &"12:34",
             note: &"Hello, world! ää 🀄🃏🅰️🅰", // This has Unicode NFC and NFD
+            sas1: &"   🍎       🎸      🕶      🍎",
+            sas2: &"apple  guitar  glasses  apple",
+            sas3: &"          😸    🎩    🔑",
+            sas4: &"          cat    hat    key",
             char_buf: ['\0'; CHAR_BUF_SIZE],
             char_buf_end: 0,
             utf8_buf: [0; UTF8_BUF_SIZE],

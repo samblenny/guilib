@@ -5,6 +5,7 @@ package font
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"strings"
 )
@@ -105,11 +106,33 @@ func StringFromHexGC(hexGC string) string {
 
 // Return mapping of hex-codepoint format grapheme clusters to grid coordinates
 // in a glyph sprite sheet for the emoji font
-func EmojiMap() []CharSpec {
-	csList := []CharSpec{
-		CharSpec{"1f004", 0, 0},
-		CharSpec{"1f0cf", 0, 1},
-		CharSpec{"1f170", 0, 2},
+func EmojiMap(fs FontSpec, inputFile string) []CharSpec {
+	text, err := ioutil.ReadFile(inputFile)
+	if err != nil {
+		panic(err)
+	}
+	// Start at top left corner of the sprite sheet glyph grid
+	row := 0
+	col := 0
+	// Parse hex format grapheme cluster lines that should look like
+	// "1f4aa-1f3fc\n" "1f4e1\n", etc. Comments starting with "#" are
+	// possible. Order of grapheme cluster lines in the file should match a
+	// row-major order traversal of the glyph grid.
+	csList := []CharSpec{}
+	for _, line := range strings.Split(string(text), "\n") {
+		// Trim comments and leading/trailing whitespace
+		txt := strings.TrimSpace(strings.SplitN(line, "#", 2)[0])
+		if len(txt) > 0 {
+			// Add a CharSpec for this grapheme cluster
+			csList = append(csList, CharSpec{txt, row, col})
+			// Advance to next glyph position by row-major order
+			col += 1
+			if col == fs.Cols {
+				row += 1
+				col = 0
+			}
+		}
+		// Skip blank lines and comments
 	}
 	return csList
 }
@@ -360,10 +383,26 @@ type GCAlias struct {
 }
 
 // Return a list of grapheme cluster aliases for the emoji font
-func EmojiAliases() []GCAlias {
-	gcaList := []GCAlias{
-		GCAlias{"1f004", "1f004-fe0f"},
-		GCAlias{"1f170", "1f170-fe0f"},
+func EmojiAliases(inputFile string) []GCAlias {
+	text, err := ioutil.ReadFile(inputFile)
+	if err != nil {
+		panic(err)
+	}
+	// Parse hex format grapheme cluster alias lines that should look like
+	// "1f004 1f004-fe0f\n". First grapheme cluster is from the primary
+	// index, second cluster is the alias which should get the same glyph.
+	// Comments starting with "#" are possible.
+	gcaList := []GCAlias{}
+	for _, line := range strings.Split(string(text), "\n") {
+		// Trim comments and leading/trailing whitespace
+		txt := strings.TrimSpace(strings.SplitN(line, "#", 2)[0])
+		clusters := strings.Split(txt, " ")
+		if len(clusters) == 2 && len(clusters[0]) > 0 && len(clusters[1]) > 0 {
+			primary := clusters[0]
+			alias := clusters[1]
+			gcaList = append(gcaList, GCAlias{primary, alias})
+		}
+		// Skip blank lines, comments, etc.
 	}
 	return gcaList
 }

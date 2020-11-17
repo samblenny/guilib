@@ -37,8 +37,8 @@ const enableDebug = false
 const outPath = "../src/fonts"
 
 // Index and alias files for grapheme clusters that go with img/emoji48x48_o3x3.png
-const emojiIndexPath = "img/emoji_13_0_index.txt"
-const emojiAliasPath = "img/emoji_13_0_aliases.txt"
+const emojiIndex = "img/emoji_13_0_index.txt"
+const emojiAliases = "img/emoji_13_0_aliases.txt"
 
 // Seed for Murmur3 hashes; in the event of hash collisions, change this
 const Murmur3Seed uint32 = 0
@@ -58,7 +58,7 @@ func codegen() {
 		var data string
 		switch f.Name {
 		case "Emoji":
-			data = genRustyFontData(f, font.EmojiMap(), font.EmojiAliases())
+			data = genRustyFontData(f, font.EmojiMap(f, emojiIndex), font.EmojiAliases(emojiAliases))
 		case "Bold":
 			data = genRustyFontData(f, font.SysLatinMap(), font.SysLatinAliases())
 		case "Regular":
