@@ -9,8 +9,8 @@
 // > domain. The author hereby disclaims copyright to this source code.
 //
 #![forbid(unsafe_code)]
-pub mod emoji;
 pub mod bold;
+pub mod emoji;
 pub mod regular;
 
 use core::fmt;
