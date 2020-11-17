@@ -9,6 +9,7 @@
 // > domain. The author hereby disclaims copyright to this source code.
 //
 #![forbid(unsafe_code)]
+pub mod emoji;
 pub mod bold;
 pub mod regular;
 
@@ -49,6 +50,7 @@ impl GlyphHeader {
 
 /// Available typeface glyph sets
 pub enum GlyphSet {
+    Emoji,
     Bold,
     Regular,
 }
@@ -73,6 +75,10 @@ pub type GlyphDataFnPtr = fn(usize) -> u32;
 impl Font {
     pub fn new(gs: GlyphSet) -> Font {
         match gs {
+            GlyphSet::Emoji => Font {
+                glyph_pattern_offset: emoji::get_blit_pattern_offset,
+                glyph_data: emoji_data,
+            },
             GlyphSet::Bold => Font {
                 glyph_pattern_offset: bold::get_blit_pattern_offset,
                 glyph_data: bold_data,
@@ -83,6 +89,11 @@ impl Font {
             },
         }
     }
+}
+
+/// Get word of packed glyph data for emoji
+pub fn emoji_data(index: usize) -> u32 {
+    emoji::DATA[index]
 }
 
 /// Get word of packed glyph data for bold

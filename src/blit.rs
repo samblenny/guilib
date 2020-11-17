@@ -34,10 +34,14 @@ pub struct ClipRegion {
 
 /// Blit string with: XOR, bold font, align xr left yr top
 pub fn string_bold_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
-    let f = Font::new(fonts::GlyphSet::Bold);
+    let f1 = Font::new(fonts::GlyphSet::Bold);
+    let f2 = Font::new(fonts::GlyphSet::Emoji);
     let mut cluster = s;
     for _ in 0..s.len() {
-        if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f) {
+        if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f1) {
+            cluster = &cluster[bytes_used..];
+            cr.x0 += glyph_width;
+        } else if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f2) {
             cluster = &cluster[bytes_used..];
             cr.x0 += glyph_width;
         } else {
@@ -53,10 +57,14 @@ pub fn string_bold_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
 
 /// Blit string with: XOR, regular font, align xr left yr top
 pub fn string_regular_left(fb: &mut LcdFB, mut cr: ClipRegion, s: &str) {
-    let f = Font::new(fonts::GlyphSet::Regular);
+    let f1 = Font::new(fonts::GlyphSet::Regular);
+    let f2 = Font::new(fonts::GlyphSet::Emoji);
     let mut cluster = s;
     for _ in 0..s.len() {
-        if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f) {
+        if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f1) {
+            cluster = &cluster[bytes_used..];
+            cr.x0 += glyph_width;
+        } else if let Ok((glyph_width, bytes_used)) = xor_char(fb, cr, cluster, f2) {
             cluster = &cluster[bytes_used..];
             cr.x0 += glyph_width;
         } else {

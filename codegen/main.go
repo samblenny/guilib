@@ -46,7 +46,7 @@ const Murmur3Seed uint32 = 0
 // Spec for how to generate font source code files from glyph grid sprite sheets
 func fonts() []font.FontSpec {
 	return []font.FontSpec{
-		font.FontSpec{"Emoji", "img/emoji_13_0_32x32_o3x3.png", 48, 16, 0, 0, twemoji, "emoji.rs"},
+		font.FontSpec{"Emoji", "img/emoji_13_0_32x32_o3x3.png", 32, 16, 0, 0, twemoji, "emoji.rs"},
 		font.FontSpec{"Bold", "img/bold.png", 30, 16, 2, 2, chicago, "bold.rs"},
 		font.FontSpec{"Regular", "img/regular.png", 30, 16, 2, 2, geneva, "regular.rs"},
 	}
@@ -58,7 +58,7 @@ func codegen() {
 		var data string
 		switch f.Name {
 		case "Emoji":
-			data = genRustyFontData(f, []font.CharSpec{}, []font.GCAlias{})
+			data = genRustyFontData(f, font.EmojiMap(), font.EmojiAliases())
 		case "Bold":
 			data = genRustyFontData(f, font.SysLatinMap(), font.SysLatinAliases())
 		case "Regular":
@@ -407,7 +407,7 @@ pub const M3_SEED: u32 = {{.M3Seed}};
 /// check to see whether the first character falls into one of the codepoint ranges
 /// for Unicode blocks included in this font.
 ///
-/// Returns: Option<(blit pattern offset into DATA, bytes of cluster used by match)>
+/// Returns: Result<(blit pattern offset into DATA, bytes of cluster used by match)>
 pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::GlyphNotFound> {
     let first_char: u32;
     match cluster.chars().next() {

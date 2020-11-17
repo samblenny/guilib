@@ -89,7 +89,7 @@ impl Context<'_> {
             status_radio: Radio::R3,
             status_title: &"home",
             status_time: &"12:34",
-            note: &"Hello, world!  C:âä  D:âä", // This has Unicode NFC and NFD
+            note: &"Hello, world! ää 🀄🃏🅰️🅰", // This has Unicode NFC and NFD
             char_buf: ['\0'; CHAR_BUF_SIZE],
             char_buf_end: 0,
             utf8_buf: [0; UTF8_BUF_SIZE],

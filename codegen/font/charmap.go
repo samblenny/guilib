@@ -104,6 +104,17 @@ func StringFromHexGC(hexGC string) string {
 }
 
 // Return mapping of hex-codepoint format grapheme clusters to grid coordinates
+// in a glyph sprite sheet for the emoji font
+func EmojiMap() []CharSpec {
+	csList := []CharSpec{
+		CharSpec{"1f004", 0, 0},
+		CharSpec{"1f0cf", 0, 1},
+		CharSpec{"1f170", 0, 2},
+	}
+	return csList
+}
+
+// Return mapping of hex-codepoint format grapheme clusters to grid coordinates
 // in a glyph sprite sheet for the system latin fonts (Bold & Regular)
 func SysLatinMap() []CharSpec {
 	return []CharSpec{
@@ -346,6 +357,15 @@ func SysLatinMap() []CharSpec {
 type GCAlias struct {
 	CanonHex string // Cannonical form in the index (has a CharSpec)
 	AliasHex string // This one should map to same glyph as CanonHex
+}
+
+// Return a list of grapheme cluster aliases for the emoji font
+func EmojiAliases() []GCAlias {
+	gcaList := []GCAlias{
+		GCAlias{"1f004", "1f004-fe0f"},
+		GCAlias{"1f170", "1f170-fe0f"},
+	}
+	return gcaList
 }
 
 // Return a list of grapheme cluster aliases for the system latin font so that

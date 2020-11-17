@@ -29,7 +29,7 @@ pub const M3_SEED: u32 = 0;
 /// check to see whether the first character falls into one of the codepoint ranges
 /// for Unicode blocks included in this font.
 ///
-/// Returns: Option<(blit pattern offset into DATA, bytes of cluster used by match)>
+/// Returns: Result<(blit pattern offset into DATA, bytes of cluster used by match)>
 pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::GlyphNotFound> {
     let first_char: u32;
     match cluster.chars().next() {

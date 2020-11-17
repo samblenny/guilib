@@ -28,6 +28,141 @@
 
 /// Maximum height of glyph patterns in this bitmap typeface.
 /// This will be true: h + y_offset <= MAX_HEIGHT
-pub const MAX_HEIGHT: u8 = 48;
+pub const MAX_HEIGHT: u8 = 32;
 
-/* TODO: Emoji data */
+/// Seed for Murmur3 hashes in the HASH_* index arrays
+pub const M3_SEED: u32 = 0;
+
+/// Return Okay(offset into DATA[]) for start of blit pattern for grapheme cluster.
+///
+/// Before doing an expensive lookup for the whole cluster, this does a pre-filter
+/// check to see whether the first character falls into one of the codepoint ranges
+/// for Unicode blocks included in this font.
+///
+/// Returns: Result<(blit pattern offset into DATA, bytes of cluster used by match)>
+pub fn get_blit_pattern_offset(cluster: &str) -> Result<(usize, usize), super::GlyphNotFound> {
+    let first_char: u32;
+    match cluster.chars().next() {
+        Some(c) => first_char = c as u32,
+        None => return Err(super::GlyphNotFound),
+    }
+    return match first_char {
+        0x1F000..=0x1F02F => {
+            if let Some((offset, bytes_used)) = find_mahjong_tiles(cluster, 2) {
+                Ok((offset, bytes_used))
+            } else if let Some((offset, bytes_used)) = find_mahjong_tiles(cluster, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
+        }
+        0x1F0A0..=0x1F0FF => {
+            if let Some((offset, bytes_used)) = find_playing_cards(cluster, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
+        }
+        0x1F100..=0x1F1FF => {
+            if let Some((offset, bytes_used)) = find_enclosed_alphanumeric_supplement(cluster, 2) {
+                Ok((offset, bytes_used))
+            } else if let Some((offset, bytes_used)) = find_enclosed_alphanumeric_supplement(cluster, 1) {
+                Ok((offset, bytes_used))
+            } else {
+                Err(super::GlyphNotFound)
+            }
+        }
+        _ => Err(super::GlyphNotFound),
+    };
+}
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_mahjong_tiles(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_MAHJONG_TILES.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_MAHJONG_TILES[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
+/// Index of murmur3(grapheme cluster); sort matches OFFSET_MAHJONG_TILES
+const HASH_MAHJONG_TILES: [u32; 2] = [
+    0x3A370578,  // "🀄️" 1F004-FE0F
+    0x81CB1E6B,  // "🀄"
+];
+
+/// Lookup table of blit pattern offsets; sort matches HASH_MAHJONG_TILES
+const OFFSET_MAHJONG_TILES: [usize; 2] = [
+    0,    // "🀄️" 1F004-FE0F
+    0,    // "🀄"
+];
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_playing_cards(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_PLAYING_CARDS.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_PLAYING_CARDS[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
+/// Index of murmur3(grapheme cluster); sort matches OFFSET_PLAYING_CARDS
+const HASH_PLAYING_CARDS: [u32; 1] = [
+    0x77DD1D57,  // "🃏"
+];
+
+/// Lookup table of blit pattern offsets; sort matches HASH_PLAYING_CARDS
+const OFFSET_PLAYING_CARDS: [usize; 1] = [
+    24,   // "🃏"
+];
+
+/// Use binary search on table of grapheme cluster hashes to find blit pattern for grapheme cluster.
+/// Only attempt to match grapheme clusters of length limit codepoints.
+fn find_enclosed_alphanumeric_supplement(cluster: &str, limit: u32) -> Option<(usize, usize)> {
+    let (key, bytes_hashed) = super::murmur3(cluster, M3_SEED, limit);
+    match HASH_ENCLOSED_ALPHANUMERIC_SUPPLEMENT.binary_search(&key) {
+        Ok(index) => return Some((OFFSET_ENCLOSED_ALPHANUMERIC_SUPPLEMENT[index], bytes_hashed)),
+        _ => None,
+    }
+}
+
+/// Index of murmur3(grapheme cluster); sort matches OFFSET_ENCLOSED_ALPHANUMERIC_SUPPLEMENT
+const HASH_ENCLOSED_ALPHANUMERIC_SUPPLEMENT: [u32; 2] = [
+    0x2949E54B,  // "🅰️" 1F170-FE0F
+    0x426C9BBE,  // "🅰"
+];
+
+/// Lookup table of blit pattern offsets; sort matches HASH_ENCLOSED_ALPHANUMERIC_SUPPLEMENT
+const OFFSET_ENCLOSED_ALPHANUMERIC_SUPPLEMENT: [usize; 2] = [
+    48,   // "🅰️" 1F170-FE0F
+    48,   // "🅰"
+];
+
+/// Packed glyph pattern data.
+/// Record format:
+///  [offset+0]: ((w as u8) << 16) | ((h as u8) << 8) | (yOffset as u8)
+///  [offset+1..=ceil(w*h/32)]: packed 1-bit pixels; 0=clear, 1=set
+/// Pixels are packed in top to bottom, left to right order with MSB of first
+/// pixel word containing the top left pixel.
+///  w: Width of pattern in pixels
+///  h: Height of pattern in pixels
+///  yOffset: Vertical offset (pixels downward from top of line) to position
+///     glyph pattern properly relative to text baseline
+pub const DATA: [u32; 81] = [
+    // [0]: 1f004 "🀄"
+    0x00171f01, 0x92492492, 0x49200000, 0x0492c924, 0x92492006, 0x00249649, 0x24924909, 0x30016db6,
+    0x49e4b6ca, 0xc1870b25, 0x964b2492, 0x420c304b, 0x6cb24b6d, 0x92006902, 0x49649249, 0x24900300,
+    0x124b2492, 0x49248018, 0x00925924, 0x92492400, 0x800492c9, 0x24924900, 0x00000492, 0x48000000,
+    // [24]: 1f0cf "🃏"
+    0x00171f01, 0x12492492, 0x59240000, 0x0492c924, 0x92492124, 0x9225925b, 0x2492db41, 0x24972592,
+    0x49249648, 0x09240924, 0x92492c92, 0x40090049, 0x24924924, 0x92027902, 0x4b64924b, 0x2c901658,
+    0x125b6492, 0x5b64a5f6, 0xebb6db6c, 0xb6596424, 0xb24492c9, 0x24924920, 0x00000492, 0x49000000,
+    // [48]: 1f170 "🅰"
+    0x00202000, 0x09249248, 0x36db6db6, 0x5b6db6db, 0x7fffffff, 0xb6db6db6, 0x5b6db6db, 0x7ffc3fff,
+    0xb6d92db6, 0x5b6c16db, 0x7ff01fff, 0xb6d92db6, 0x5b6096db, 0x7fe087ff, 0xb6c925b6, 0x5b6186db,
+    0x7fe183ff, 0xb6cb65b6, 0x5b4582db, 0x7f8003ff, 0xb6c925b6, 0x5b0000db, 0x7f0000ff, 0xb64b64b6,
+    0x5b0db05b, 0x7f0ff07f, 0xb6db6db6, 0x5b6db6db, 0x7fffffff, 0xb6db6db6, 0x5b6db6db, 0x7ffffffc,
+    0x16db6db0,
+];
