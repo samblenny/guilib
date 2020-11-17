@@ -1,3 +1,7 @@
+// Copyright (c) 2020 Sam Blenny
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+
 /// WASM Notes:
 /// 1. The panic() boilerplate below allows use of no_std without wasm-bindgen
 ///    and wasm-pack.

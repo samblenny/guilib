@@ -1,4 +1,4 @@
-# Credits
+# Legal Notices
 
 ## Bitmap Typeface Glyphs
 

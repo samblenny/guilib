@@ -1,4 +1,7 @@
 #!/usr/bin/ruby
+# Copyright (c) 2020 Sam Blenny
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+#
 # This generates blit patterns for building a blank onscreen keyboard
 
 # RLE encodings for top row, letter keys, and spacebar row

@@ -1,4 +1,7 @@
 #!/usr/bin/ruby
+# Copyright (c) 2020 Sam Blenny
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+#
 require 'webrick'
 
 # Serve the current working directory on http://localhost:8000
